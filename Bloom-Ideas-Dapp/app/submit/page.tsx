@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeft, Flower2, Sparkles, Upload } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
 
 const availableTags = ["DeFi", "ZK", "NFT", "AI", "Tooling", "SDK", "Gaming", "Social", "Infrastructure", "Privacy"]
 const techStackOptions = [
@@ -64,7 +63,7 @@ export default function SubmitIdeaPage() {
               </Link>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-                  <Image src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" width={32} height={32} className="object-contain" />
+                  <Flower2 className="w-5 h-5 text-white" />
                 </div>
                 <span className="font-semibold text-emerald-800">Plant New Idea</span>
               </div>

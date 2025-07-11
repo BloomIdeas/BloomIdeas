@@ -6,9 +6,9 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Bloom Ideas - Web3 Hackathon Ideas Platform",
+  title: "Bloom Ideas - Web3 Hackathon Platform",
   description: "Where hackathon ideas flourish in invisible gardens",
-  generator: 'Pranshu Rastogi'
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({

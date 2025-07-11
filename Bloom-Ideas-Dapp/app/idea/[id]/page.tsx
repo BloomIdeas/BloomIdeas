@@ -21,7 +21,6 @@ import {
 import Link from "next/link"
 import { Progress } from "@/components/ui/progress"
 import ProfilePopup from "@/components/profile-popup"
-import Image from "next/image"
 
 const mockIdea = {
   id: 1,
@@ -197,7 +196,7 @@ export default function IdeaDetailPage() {
               </Link>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-                  <Image src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" width={32} height={32} className="object-contain" />
+                  <Flower2 className="w-5 h-5 text-white" />
                 </div>
                 <span className="font-semibold text-emerald-800">Bloom Ideas</span>
               </div>
