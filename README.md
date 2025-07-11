@@ -1,4 +1,4 @@
-# Bloom Ideas - Web3 Hackathon Ideas Platform
+# Bloom Ideas: Where Ideas flourish
 
 **Where hackathon ideas flourish in invisible gardens**
 
