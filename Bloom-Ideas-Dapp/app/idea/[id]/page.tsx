@@ -21,6 +21,7 @@ import {
 import Link from "next/link"
 import { Progress } from "@/components/ui/progress"
 import ProfilePopup from "@/components/profile-popup"
+import UniversalWalletConnection from "@/components/universal-wallet-connection"
 
 const mockIdea = {
   id: 1,
@@ -201,13 +202,7 @@ export default function IdeaDetailPage() {
                 <span className="font-semibold text-emerald-800">Bloom Ideas</span>
               </div>
             </div>
-            <Button
-              variant="outline"
-              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Connect Wallet
-            </Button>
+            <UniversalWalletConnection />
           </div>
         </div>
       </header>

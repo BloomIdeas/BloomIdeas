@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeft, Flower2, Sparkles, Upload } from "lucide-react"
 import Link from "next/link"
+import UniversalWalletConnection from "@/components/universal-wallet-connection"
 
 const availableTags = ["DeFi", "ZK", "NFT", "AI", "Tooling", "SDK", "Gaming", "Social", "Infrastructure", "Privacy"]
 const techStackOptions = [
@@ -68,13 +69,7 @@ export default function SubmitIdeaPage() {
                 <span className="font-semibold text-emerald-800">Plant New Idea</span>
               </div>
             </div>
-            <Button
-              variant="outline"
-              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Connect Wallet
-            </Button>
+            <UniversalWalletConnection />
           </div>
         </div>
       </header>
