@@ -11,6 +11,7 @@ import SimplifiedIdeaCard from "@/components/simplified-idea-card"
 import UniversalWalletConnection from "@/components/universal-wallet-connection"
 import GardenExplorer from "@/components/garden-explorer"
 import { FloatingGardenElements, SeasonalBackground, GardenWeather } from "@/components/garden-elements"
+import EnhancedFooter from "@/components/EnhancedFooter"
 
 const mockIdeas = [
   {
@@ -141,9 +142,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center animate-pulse">
-                <Flower2 className="w-6 h-6 text-white" />
-              </div>
+              <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-10 h-10 rounded-full shadow" />
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
                   Bloom Ideas
@@ -292,34 +291,7 @@ export default function HomePage() {
         )}
 
         {/* Enhanced Footer */}
-        <footer className="mt-20 border-t border-emerald-200/50 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 backdrop-blur-sm rounded-t-2xl">
-          <div className="container mx-auto px-4 py-8">
-            <div className="flex flex-col md:flex-row items-center justify-between">
-              <div className="flex items-center gap-3 mb-4 md:mb-0">
-                <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center animate-pulse">
-                  <Flower2 className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                    Bloom Ideas 🌸
-                  </h3>
-                  <p className="text-xs text-emerald-600/70">Where ideas flourish and dreams bloom</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 text-emerald-600/70 text-sm">
-                <span>🌱 Plant</span>
-                <span>🌿 Grow</span>
-                <span>🌸 Bloom</span>
-                <span>🌻 Harvest</span>
-              </div>
-
-              <p className="text-emerald-600/70 text-sm flex items-center gap-1">
-                Made with 💚 for the Web3 garden community 🌺
-              </p>
-            </div>
-          </div>
-        </footer>
+        <EnhancedFooter />
       </main>
 
       {selectedProfile && <ProfilePopup address={selectedProfile} onClose={() => setSelectedProfile(null)} />}

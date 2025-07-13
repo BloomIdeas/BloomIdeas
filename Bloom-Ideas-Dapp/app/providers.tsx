@@ -20,7 +20,21 @@ export default function Providers({ children, cookie }: Props) {
     <WagmiProvider config={config} initialState={initialState}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <Toaster position="top-right" />
+          <Toaster 
+            position="top-left" 
+            toastOptions={{
+              classNames: {
+                toast: "bg-white/95 backdrop-blur-sm border-emerald-200 text-emerald-900 shadow-lg",
+                title: "text-emerald-900 font-semibold",
+                description: "text-emerald-700",
+                actionButton: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200",
+                cancelButton: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200",
+                closeButton: "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100",
+              },
+              duration: 4000,
+            }}
+            closeButton={true}
+          />
           {children}
         </RainbowKitProvider>
       </QueryClientProvider>

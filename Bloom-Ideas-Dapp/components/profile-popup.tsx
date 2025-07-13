@@ -32,7 +32,7 @@ const mockProfile = {
   ensName: "builder.eth",
   avatar: "/placeholder.svg?height=120&width=120",
   displayName: "Garden Builder",
-  bio: "Passionate Web3 developer cultivating the future of DeFi. Love building beautiful, functional protocols that make crypto accessible to everyone. 🌱",
+  bio: " Web3 developer cultivating the future of DeFi. Love building beautiful, functional protocols that make crypto accessible to everyone. 🌱",
   reputation: "Grove-Keeper",
   reputationLevel: 4,
   joinDate: "March 2023",

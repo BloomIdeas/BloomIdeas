@@ -1,12 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -17,102 +16,317 @@ import {
   Twitter,
   MessageCircle,
   ExternalLink,
-  Crown,
-  Zap,
-  Trophy,
-  Heart,
-  Code,
-  Star,
   Edit,
   Save,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  User,
 } from "lucide-react"
 import Link from "next/link"
+import { useAccount } from "wagmi"
+import { useSignatureVerification } from "@/hooks/use-signature-verification"
+import { supabase } from "@/lib/supabaseClient"
+import { toast } from "sonner"
+import EmojiPicker from "@/components/emoji-picker"
 
-const mockProfile = {
-  address: "0x1234...5678",
-  ensName: "builder.eth",
-  avatar: "/placeholder.svg?height=120&width=120",
-  displayName: "Garden Builder",
-  bio: "Passionate Web3 developer cultivating the future of DeFi. Love building beautiful, functional protocols that make crypto accessible to everyone. 🌱",
-  reputation: "Grove-Keeper",
-  reputationLevel: 4,
-  joinDate: "March 2023",
-  location: "San Francisco, CA",
-  website: "https://gardenbuilder.dev",
-  social: {
-    github: "gardenbuilder",
-    twitter: "gardenbuilder_",
-    discord: "gardenbuilder#1234",
-  },
-  stats: {
-    ideasSubmitted: 12,
-    ideasBuilt: 8,
-    votesGiven: 156,
-    commentsPosted: 89,
-    sprouts: 342,
-    currentStreak: 15,
-    longestStreak: 28,
-  },
-  nfts: [
-    {
-      id: 1,
-      name: "Seed Planter",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Common",
-      description: "First idea planted in the garden",
-      earned: "Dec 2023",
-    },
-    {
-      id: 2,
-      name: "First Bloom",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Rare",
-      description: "First idea successfully built",
-      earned: "Jan 2024",
-    },
-    {
-      id: 3,
-      name: "Grove Keeper",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Epic",
-      description: "Reached Grove-Keeper reputation",
-      earned: "Feb 2024",
-    },
-    {
-      id: 4,
-      name: "Innovation Catalyst",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Legendary",
-      description: "Inspired 10+ builders to join projects",
-      earned: "Mar 2024",
-    },
-  ],
+// Types
+interface UserProfile {
+  wallet_address: string
+  signature: string
+  signature_count: number
+  role: 'user' | 'admin' | 'moderator'
+  blocked: boolean
+  bloom_username?: string
+  description?: string
+  github_username?: string
+  twitter_username?: string
+  pfp_emoji?: string
+  created_at: string
+  updated_at: string
 }
 
-const reputationLevels = [
-  { name: "Seed", level: 1, color: "bg-yellow-400", sproutsNeeded: 0 },
-  { name: "Sprout", level: 2, color: "bg-green-400", sproutsNeeded: 50 },
-  { name: "Bloom", level: 3, color: "bg-emerald-400", sproutsNeeded: 150 },
-  { name: "Grove-Keeper", level: 4, color: "bg-teal-400", sproutsNeeded: 300 },
-  { name: "Garden Master", level: 5, color: "bg-purple-400", sproutsNeeded: 500 },
-]
+const defaultProfile: UserProfile = {
+  wallet_address: "",
+  signature: "",
+  signature_count: 1,
+  role: 'user',
+  blocked: false,
+  bloom_username: "",
+  description: "",
+  github_username: "",
+  twitter_username: "",
+  pfp_emoji: "🌱",
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+}
 
 export default function MyProfilePage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [isEditing, setIsEditing] = useState(false)
-  const [profileData, setProfileData] = useState(mockProfile)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [profileData, setProfileData] = useState<UserProfile>(defaultProfile)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [usernameCheckLoading, setUsernameCheckLoading] = useState(false)
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
 
-  const currentLevel = reputationLevels.find((level) => level.level === mockProfile.reputationLevel)
-  const nextLevel = reputationLevels.find((level) => level.level === mockProfile.reputationLevel + 1)
-  const progressToNext = nextLevel
-    ? ((mockProfile.stats.sprouts - currentLevel!.sproutsNeeded) /
-        (nextLevel.sproutsNeeded - currentLevel!.sproutsNeeded)) *
-      100
-    : 100
+  const { address, isConnected } = useAccount()
+  const { hasVerifiedSignature } = useSignatureVerification()
 
-  const handleSave = () => {
-    setIsEditing(false)
-    // Here you would save the profile data to your backend
+  // Check if user is authenticated
+  const isAuthenticated = isConnected && hasVerifiedSignature && address
+
+  // Fetch user profile on mount
+  useEffect(() => {
+    if (isAuthenticated && address) {
+      fetchUserProfile()
+    } else {
+      setIsLoading(false)
+    }
+  }, [isAuthenticated, address])
+
+  // Fetch user profile from Supabase
+  const fetchUserProfile = async () => {
+    try {
+      setIsLoading(true)
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('wallet_address', address)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        throw error
+      }
+
+      if (data) {
+        setProfileData({
+          wallet_address: data.wallet_address,
+          signature: data.signature,
+          signature_count: data.signature_count,
+          role: data.role,
+          blocked: data.blocked,
+          bloom_username: data.bloom_username || "",
+          description: data.description || "",
+          github_username: data.github_username || "",
+          twitter_username: data.twitter_username || "",
+          pfp_emoji: data.pfp_emoji || "🌱",
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+        })
+      } else {
+        // Create new profile if doesn't exist
+        setProfileData({
+          ...defaultProfile,
+          wallet_address: address || "",
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error)
+      toast.error('Failed to load profile')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Check username availability
+  const checkUsernameAvailability = async (username: string) => {
+    if (!username || username.length < 3 || !address) {
+      setUsernameAvailable(null)
+      return
+    }
+
+    try {
+      setUsernameCheckLoading(true)
+      const { data, error } = await supabase
+        .from('users')
+        .select('bloom_username')
+        .eq('bloom_username', username)
+        .neq('wallet_address', address) // Exclude current user
+        .single()
+
+      if (error && error.code === 'PGRST116') {
+        // No user found with this username
+        setUsernameAvailable(true)
+      } else if (data) {
+        // Username already taken
+        setUsernameAvailable(false)
+      } else {
+        setUsernameAvailable(true)
+      }
+    } catch (error) {
+      console.error('Error checking username:', error)
+      setUsernameAvailable(null)
+    } finally {
+      setUsernameCheckLoading(false)
+    }
+  }
+
+  // Helper function to clean social media usernames
+  const cleanSocialUsername = (username: string): string => {
+    // Remove @ symbol if present and trim whitespace
+    return username.replace(/^@/, '').trim()
+  }
+
+  // Validate form data
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {}
+
+    // Username validation
+    if (!profileData.bloom_username) {
+      errors.bloom_username = "Bloom username is required"
+    } else if (profileData.bloom_username.length < 3) {
+      errors.bloom_username = "Username must be at least 3 characters"
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(profileData.bloom_username)) {
+      errors.bloom_username = "Username can only contain letters, numbers, hyphens, and underscores"
+    } else if (usernameAvailable === false) {
+      errors.bloom_username = "Username is already taken"
+    }
+
+    // Description validation
+    if (profileData.description && profileData.description.length > 500) {
+      errors.description = "Description must be 500 characters or less"
+    }
+
+    // Social media validation
+    if (profileData.github_username) {
+      const cleanGithub = cleanSocialUsername(profileData.github_username)
+      if (!cleanGithub) {
+        errors.github_username = "GitHub username cannot be empty"
+      } else if (!/^[a-zA-Z0-9-]+$/.test(cleanGithub)) {
+        errors.github_username = "GitHub username can only contain letters, numbers, and hyphens"
+      } else if (cleanGithub.length > 39) {
+        errors.github_username = "GitHub username must be 39 characters or less"
+      }
+    }
+
+    if (profileData.twitter_username) {
+      const cleanTwitter = cleanSocialUsername(profileData.twitter_username)
+      if (!cleanTwitter) {
+        errors.twitter_username = "Twitter username cannot be empty"
+      } else if (!/^[a-zA-Z0-9_]+$/.test(cleanTwitter)) {
+        errors.twitter_username = "Twitter username can only contain letters, numbers, and underscores"
+      } else if (cleanTwitter.length > 15) {
+        errors.twitter_username = "Twitter username must be 15 characters or less"
+      }
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  // Handle form field changes
+  const handleFieldChange = (field: keyof UserProfile, value: string) => {
+    setProfileData(prev => ({ ...prev, [field]: value }))
+    
+    // Clear validation error for this field
+    if (validationErrors[field]) {
+      setValidationErrors(prev => ({ ...prev, [field]: "" }))
+    }
+
+    // Check username availability
+    if (field === 'bloom_username') {
+      const timeoutId = setTimeout(() => checkUsernameAvailability(value), 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }
+
+  // Save profile data
+  const handleSave = async () => {
+    if (!isAuthenticated || !address) {
+      toast.error('Please connect your wallet first')
+      return
+    }
+
+    if (!validateForm()) {
+      // Show specific validation errors
+      const errorMessages = Object.values(validationErrors).filter(msg => msg)
+      if (errorMessages.length > 0) {
+        toast.error(`Please fix the following errors: ${errorMessages.join(', ')}`)
+      }
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      
+      // Clean social media usernames before saving
+      const cleanGithub = profileData.github_username ? cleanSocialUsername(profileData.github_username) : null
+      const cleanTwitter = profileData.twitter_username ? cleanSocialUsername(profileData.twitter_username) : null
+      
+      const updateData = {
+        wallet_address: address,
+        signature: profileData.signature, // Keep existing signature
+        signature_count: profileData.signature_count, // Keep existing signature count
+        role: profileData.role, // Keep existing role
+        blocked: profileData.blocked, // Keep existing blocked status
+        bloom_username: profileData.bloom_username || null,
+        description: profileData.description || null,
+        pfp_emoji: profileData.pfp_emoji || "🌱",
+        github_username: cleanGithub,
+        twitter_username: cleanTwitter,
+        updated_at: new Date().toISOString(),
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .upsert(updateData, { onConflict: 'wallet_address' })
+
+      if (error) {
+        throw error
+      }
+
+      toast.success('Profile updated successfully!')
+      setIsEditing(false)
+      setValidationErrors({})
+      setUsernameAvailable(null)
+      
+      // Refresh profile data
+      await fetchUserProfile()
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      toast.error('Failed to save profile')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-emerald-700">Loading your garden profile...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show authentication required
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm max-w-md">
+          <CardContent className="p-8 text-center">
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Flower2 className="w-8 h-8 text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-emerald-900 mb-2">Garden Access Required</h2>
+            <p className="text-emerald-700 mb-6">
+              Please connect your wallet and sign a message to access your garden profile.
+            </p>
+            <Link href="/">
+              <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Garden
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -141,9 +355,15 @@ export default function MyProfilePage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsEditing(!isEditing)}
+                disabled={isSaving}
                 className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
               >
-                {isEditing ? (
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : isEditing ? (
                   <>
                     <Save className="w-4 h-4 mr-2" />
                     Save Changes
@@ -166,117 +386,191 @@ export default function MyProfilePage() {
           <div className="h-24 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-t-lg"></div>
           <CardContent className="relative pt-0 pb-6">
             <div className="flex flex-col md:flex-row items-start gap-6 -mt-12">
-              <Avatar className="w-24 h-24 border-4 border-white shadow-lg">
-                <AvatarImage src={profileData.avatar || "/placeholder.svg"} alt={profileData.displayName} />
-                <AvatarFallback className="text-2xl bg-emerald-100 text-emerald-700">GB</AvatarFallback>
-              </Avatar>
+              {/* Avatar with Emoji Picker */}
+              <div className="relative">
+                <Avatar className="w-24 h-24 border-4 border-white shadow-lg">
+                  <AvatarFallback className="text-3xl bg-emerald-100 text-emerald-700">
+                    {profileData.pfp_emoji || "🌱"}
+                  </AvatarFallback>
+                </Avatar>
+                {isEditing && (
+                  <div className="absolute -bottom-2 -right-2">
+                    <EmojiPicker
+                      selectedEmoji={profileData.pfp_emoji || "🌱"}
+                      onEmojiSelect={(emoji) => handleFieldChange('pfp_emoji', emoji)}
+                    />
+                  </div>
+                )}
+              </div>
 
               <div className="flex-1 pt-12 md:pt-4">
                 {isEditing ? (
                   <div className="space-y-4">
+                    {/* Username Field */}
                     <div>
-                      <Label htmlFor="displayName">Display Name</Label>
-                      <Input
-                        id="displayName"
-                        value={profileData.displayName}
-                        onChange={(e) => setProfileData({ ...profileData, displayName: e.target.value })}
-                        className="border-emerald-200 focus:border-emerald-400"
-                      />
+                      <Label htmlFor="bloom_username">Bloom Username *</Label>
+                      <div className="relative">
+                        <Input
+                          id="bloom_username"
+                          value={profileData.bloom_username || ""}
+                          onChange={(e) => handleFieldChange('bloom_username', e.target.value)}
+                          className={`border-emerald-200 focus:border-emerald-400 ${
+                            validationErrors.bloom_username ? 'border-red-300' : ''
+                          }`}
+                          placeholder="your-username"
+                        />
+                        {usernameCheckLoading && (
+                          <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 animate-spin text-emerald-400" />
+                        )}
+                        {usernameAvailable === true && !usernameCheckLoading && (
+                          <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-green-500" />
+                        )}
+                        {usernameAvailable === false && !usernameCheckLoading && (
+                          <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-red-500" />
+                        )}
+                      </div>
+                      {validationErrors.bloom_username && (
+                        <p className="text-sm text-red-600 mt-1">{validationErrors.bloom_username}</p>
+                      )}
+                      <p className="text-xs text-emerald-600/70 mt-1">
+                        This will be your unique identifier in the garden. Only letters, numbers, hyphens, and underscores allowed.
+                      </p>
                     </div>
+
+                    {/* Description Field */}
                     <div>
-                      <Label htmlFor="bio">Bio</Label>
+                      <Label htmlFor="description">Description</Label>
                       <Textarea
-                        id="bio"
-                        value={profileData.bio}
-                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                        className="border-emerald-200 focus:border-emerald-400"
+                        id="description"
+                        value={profileData.description || ""}
+                        onChange={(e) => handleFieldChange('description', e.target.value)}
+                        className={`border-emerald-200 focus:border-emerald-400 ${
+                          validationErrors.description ? 'border-red-300' : ''
+                        }`}
+                        placeholder="Tell us about yourself and your interests..."
+                        rows={4}
                       />
+                      {validationErrors.description && (
+                        <p className="text-sm text-red-600 mt-1">{validationErrors.description}</p>
+                      )}
+                      <p className="text-xs text-emerald-600/70 mt-1">
+                        {(profileData.description || "").length}/500 characters
+                      </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+
+                    {/* Social Links */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="github">GitHub Username</Label>
                         <Input
                           id="github"
-                          value={profileData.social.github}
-                          onChange={(e) =>
-                            setProfileData({
-                              ...profileData,
-                              social: { ...profileData.social, github: e.target.value },
-                            })
-                          }
-                          className="border-emerald-200 focus:border-emerald-400"
+                          value={profileData.github_username || ""}
+                          onChange={(e) => handleFieldChange('github_username', e.target.value)}
+                          className={`border-emerald-200 focus:border-emerald-400 ${
+                            validationErrors.github_username ? 'border-red-300' : ''
+                          }`}
+                          placeholder="username or @username"
                         />
+                        {validationErrors.github_username && (
+                          <p className="text-sm text-red-600 mt-1">{validationErrors.github_username}</p>
+                        )}
+                        <p className="text-xs text-emerald-600/70 mt-1">
+                          Enter username only (e.g., "johndoe" or "@johndoe"). We'll automatically add https://github.com/
+                        </p>
                       </div>
                       <div>
                         <Label htmlFor="twitter">Twitter Username</Label>
                         <Input
                           id="twitter"
-                          value={profileData.social.twitter}
-                          onChange={(e) =>
-                            setProfileData({
-                              ...profileData,
-                              social: { ...profileData.social, twitter: e.target.value },
-                            })
-                          }
-                          className="border-emerald-200 focus:border-emerald-400"
+                          value={profileData.twitter_username || ""}
+                          onChange={(e) => handleFieldChange('twitter_username', e.target.value)}
+                          className={`border-emerald-200 focus:border-emerald-400 ${
+                            validationErrors.twitter_username ? 'border-red-300' : ''
+                          }`}
+                          placeholder="username or @username"
                         />
+                        {validationErrors.twitter_username && (
+                          <p className="text-sm text-red-600 mt-1">{validationErrors.twitter_username}</p>
+                        )}
+                        <p className="text-xs text-emerald-600/70 mt-1">
+                          Enter username only (e.g., "johndoe" or "@johndoe"). We'll automatically add https://x.com/
+                        </p>
                       </div>
                     </div>
-                    <Button onClick={handleSave} className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Changes
+
+                    {/* Save Button */}
+                    <Button 
+                      onClick={handleSave} 
+                      disabled={isSaving || Object.keys(validationErrors).length > 0}
+                      className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save Changes
+                        </>
+                      )}
                     </Button>
                   </div>
                 ) : (
                   <div>
-                    <h1 className="text-2xl font-bold text-emerald-900 mb-1">{profileData.displayName}</h1>
+                    <h1 className="text-2xl font-bold text-emerald-900 mb-1">
+                      {profileData.bloom_username || "Anonymous Gardener"}
+                    </h1>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-emerald-700 font-medium">{profileData.ensName}</span>
-                      <span className="text-emerald-600/70">({profileData.address})</span>
-                      <Badge className={`${currentLevel?.color} text-white border-0`}>
-                        <Crown className="w-3 h-3 mr-1" />
-                        {profileData.reputation}
+                      {profileData.bloom_username && (
+                        <span className="text-emerald-700 font-medium">@{profileData.bloom_username}</span>
+                      )}
+                      <span className="text-emerald-600/70">({address?.slice(0, 6)}...{address?.slice(-4)})</span>
+                      <Badge className="bg-teal-400 text-white border-0">
+                        <User className="w-3 h-3 mr-1" />
+                        {profileData.role}
                       </Badge>
                     </div>
-                    <p className="text-emerald-800/80 max-w-2xl mb-4">{profileData.bio}</p>
+                    <p className="text-emerald-800/80 max-w-2xl mb-4">
+                      {profileData.description || "No description provided yet."}
+                    </p>
 
                     {/* Social Links */}
                     <div className="flex items-center gap-4 mb-4">
-                      <a
-                        href={`https://github.com/${profileData.social.github}`}
-                        className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors"
-                      >
-                        <Github className="w-4 h-4" />
-                        <span className="text-sm">@{profileData.social.github}</span>
-                      </a>
-                      <a
-                        href={`https://twitter.com/${profileData.social.twitter}`}
-                        className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors"
-                      >
-                        <Twitter className="w-4 h-4" />
-                        <span className="text-sm">@{profileData.social.twitter}</span>
-                      </a>
-                      <div className="flex items-center gap-2 text-emerald-600">
-                        <MessageCircle className="w-4 h-4" />
-                        <span className="text-sm">{profileData.social.discord}</span>
-                      </div>
+                      {profileData.github_username && (
+                        <a
+                          href={`https://github.com/${profileData.github_username}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors"
+                        >
+                          <Github className="w-4 h-4" />
+                          <span className="text-sm">@{profileData.github_username}</span>
+                        </a>
+                      )}
+                      {profileData.twitter_username && (
+                        <a
+                          href={`https://x.com/${profileData.twitter_username}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors"
+                        >
+                          <Twitter className="w-4 h-4" />
+                          <span className="text-sm">@{profileData.twitter_username}</span>
+                        </a>
+                      )}
                     </div>
 
-                    {/* Reputation Progress */}
+                    {/* Account Info */}
                     <div className="bg-emerald-50 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-emerald-800">Garden Growth</span>
-                        <span className="text-sm text-emerald-600">{profileData.stats.sprouts} Sprouts</span>
+                        <span className="text-sm font-medium text-emerald-800">Account Status</span>
+                        <span className="text-sm text-emerald-600">
+                          {profileData.blocked ? "Blocked" : "Active"}
+                        </span>
                       </div>
-                      <Progress value={progressToNext} className="h-2 mb-2" />
-                      <div className="flex justify-between text-xs text-emerald-600/70">
-                        <span>{currentLevel?.name}</span>
-                        {nextLevel && (
-                          <span>
-                            {nextLevel.sproutsNeeded - profileData.stats.sprouts} to {nextLevel.name}
-                          </span>
-                        )}
-                      </div>
+                     
                     </div>
                   </div>
                 )}
@@ -285,52 +579,9 @@ export default function MyProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-4 text-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-2">
-                <Code className="w-6 h-6 text-blue-600" />
-              </div>
-              <p className="text-2xl font-bold text-emerald-900">{profileData.stats.ideasSubmitted}</p>
-              <p className="text-sm text-emerald-600/70">Ideas Planted</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-4 text-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mx-auto mb-2">
-                <Trophy className="w-6 h-6 text-green-600" />
-              </div>
-              <p className="text-2xl font-bold text-emerald-900">{profileData.stats.ideasBuilt}</p>
-              <p className="text-sm text-emerald-600/70">Ideas Built</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-4 text-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-rose-100 to-rose-200 rounded-full flex items-center justify-center mx-auto mb-2">
-                <Heart className="w-6 h-6 text-rose-600" />
-              </div>
-              <p className="text-2xl font-bold text-emerald-900">{profileData.stats.votesGiven}</p>
-              <p className="text-sm text-emerald-600/70">Votes Cast</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-4 text-center">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 rounded-full flex items-center justify-center mx-auto mb-2">
-                <Zap className="w-6 h-6 text-orange-600" />
-              </div>
-              <p className="text-2xl font-bold text-emerald-900">{profileData.stats.currentStreak}</p>
-              <p className="text-sm text-emerald-600/70">Day Streak</p>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 bg-white/80 border border-emerald-200">
+          <TabsList className="grid w-full grid-cols-3 bg-white/80 border border-emerald-200">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800"
@@ -338,16 +589,10 @@ export default function MyProfilePage() {
               Overview
             </TabsTrigger>
             <TabsTrigger
-              value="ideas"
+              value="activity"
               className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800"
             >
-              My Ideas
-            </TabsTrigger>
-            <TabsTrigger
-              value="garden"
-              className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800"
-            >
-              NFT Garden
+              Activity
             </TabsTrigger>
             <TabsTrigger
               value="settings"
@@ -371,7 +616,7 @@ export default function MyProfilePage() {
                       <div
                         key={i}
                         className={`w-6 h-6 rounded-full ${
-                          i < Math.floor(profileData.stats.sprouts / 10)
+                          i < Math.floor((profileData.signature_count || 0) / 2)
                             ? "bg-gradient-to-br from-pink-400 to-rose-500 animate-pulse"
                             : "bg-emerald-100"
                         }`}
@@ -379,88 +624,78 @@ export default function MyProfilePage() {
                     ))}
                   </div>
                   <p className="text-emerald-700 font-medium">
-                    {Math.floor(profileData.stats.sprouts / 10)} petals bloomed from your garden activities
+                    {Math.floor((profileData.signature_count || 0) / 2)} petals bloomed from your garden activities
                   </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Activity */}
-            <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h3 className="text-xl font-semibold text-emerald-900">Recent Garden Activity</h3>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg">
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <Heart className="w-4 h-4 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-emerald-900 font-medium">Loved "ZK Privacy Garden"</p>
-                    <p className="text-sm text-emerald-600/70">2 hours ago • +1 Sprout</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <MessageCircle className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-emerald-900 font-medium">Commented on "DeFi Yield Optimizer"</p>
-                    <p className="text-sm text-emerald-600/70">1 day ago • +2 Sprouts</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                    <Star className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-emerald-900 font-medium">Planted new idea "Cross-Chain Bridge"</p>
-                    <p className="text-sm text-emerald-600/70">3 days ago • +5 Sprouts</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="garden" className="space-y-6">
+          <TabsContent value="activity" className="space-y-6">
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
               <CardHeader>
-                <h3 className="text-xl font-semibold text-emerald-900">🎨 Invisible Gardens NFT Collection</h3>
-                <p className="text-emerald-700/70">Your earned achievements and milestones</p>
+                <h3 className="text-xl font-semibold text-emerald-900">Recent Garden Activity</h3>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  {profileData.nfts.map((nft) => (
-                    <Card key={nft.id} className="border-emerald-100 hover:shadow-lg transition-shadow">
-                      <CardContent className="p-4 text-center">
-                        <div className="w-20 h-20 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg mx-auto mb-3 flex items-center justify-center">
-                          <Flower2 className="w-10 h-10 text-emerald-600" />
-                        </div>
-                        <h4 className="font-semibold text-emerald-900 mb-1">{nft.name}</h4>
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${
-                            nft.rarity === "Legendary"
-                              ? "border-purple-300 text-purple-700"
-                              : nft.rarity === "Epic"
-                                ? "border-orange-300 text-orange-700"
-                                : nft.rarity === "Rare"
-                                  ? "border-blue-300 text-blue-700"
-                                  : "border-gray-300 text-gray-700"
-                          }`}
-                        >
-                          {nft.rarity}
-                        </Badge>
-                        <p className="text-xs text-emerald-700/80 mt-2 mb-3">{nft.description}</p>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="flex-1 text-xs bg-transparent">
-                            <ExternalLink className="w-3 h-3 mr-1" />
-                            View
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Flower2 className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <p className="text-emerald-700">Start building to see your activity here!</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
+              <CardHeader>
+                <h3 className="text-xl font-semibold text-emerald-900">Account Settings</h3>
+                <p className="text-emerald-700/70">Manage your account preferences</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-emerald-900">Wallet Address</p>
+                    <p className="text-sm text-emerald-600">{address}</p>
+                  </div>
+                  <Badge variant="outline" className="border-emerald-200 text-emerald-700">
+                    Connected
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-emerald-900">Account Role</p>
+                    <p className="text-sm text-emerald-600 capitalize">{profileData.role}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-emerald-900">Account Status</p>
+                    <p className="text-sm text-emerald-600">
+                      {profileData.blocked ? "Blocked" : "Active"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-emerald-900">Profile Created</p>
+                    <p className="text-sm text-emerald-600">
+                      {new Date(profileData.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg">
+                  <div>
+                    <p className="font-medium text-emerald-900">Last Updated</p>
+                    <p className="text-sm text-emerald-600">
+                      {new Date(profileData.updated_at).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -31,6 +31,8 @@ export default function UniversalWalletConnection({
   const { data: balanceData } = useBalance({ address, chainId })
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSigningModal, setShowSigningModal] = useState(false)
+  const [bloomUsername, setBloomUsername] = useState<string | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const {
     hasVerifiedSignature,
@@ -44,6 +46,48 @@ export default function UniversalWalletConnection({
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Handle clicking outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showDropdown])
+
+  // Fetch user's bloom_username when connected and authenticated
+  useEffect(() => {
+    const fetchBloomUsername = async () => {
+      if (isMounted && isConnected && address && hasVerifiedSignature) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('bloom_username')
+            .eq('wallet_address', address)
+            .single()
+
+          if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching bloom_username:', error)
+          } else if (data) {
+            setBloomUsername(data.bloom_username)
+          }
+        } catch (err) {
+          console.error('Error fetching bloom_username:', err)
+        }
+      }
+    }
+
+    fetchBloomUsername()
+  }, [isMounted, isConnected, address, hasVerifiedSignature])
 
   // if connected but no valid signature, prompt sign
   useEffect(() => {
@@ -201,9 +245,12 @@ export default function UniversalWalletConnection({
         </Badge>
       </Button>
 
-      {showDropdown && (
-        <Card className="absolute top-full right-0 mt-2 w-80 border-emerald-100 
-                         bg-white/95 backdrop-blur-sm shadow-lg z-50">
+            {showDropdown && (
+        <Card 
+          ref={dropdownRef}
+          className="absolute top-full right-0 mt-2 w-80 border-emerald-100 
+                     bg-white/95 backdrop-blur-sm shadow-lg z-50"
+        >
           <CardContent className="p-4 space-y-4">
             {/* Profile Header */}
             <div className="flex items-center gap-3 border-b border-emerald-100 pb-3">
@@ -213,7 +260,9 @@ export default function UniversalWalletConnection({
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <p className="font-semibold text-emerald-900">Anonymous Gardener</p>
+                <p className="font-semibold text-emerald-900">
+                  {bloomUsername || "Anonymous Gardener"}
+                </p>
                 <p className="text-sm text-emerald-600/70">{shortAddr}</p>
                 <Badge className="bg-teal-400 text-white border-0 mt-1">
                   Grove-Keeper

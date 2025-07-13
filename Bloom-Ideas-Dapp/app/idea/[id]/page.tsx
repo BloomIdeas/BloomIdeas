@@ -196,9 +196,7 @@ export default function IdeaDetailPage() {
                 </Button>
               </Link>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-                  <Flower2 className="w-5 h-5 text-white" />
-                </div>
+                <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-8 h-8 rounded-full shadow" />
                 <span className="font-semibold text-emerald-800">Bloom Ideas</span>
               </div>
             </div>
