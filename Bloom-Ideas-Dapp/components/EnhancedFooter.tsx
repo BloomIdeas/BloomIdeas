@@ -65,6 +65,24 @@ export default function EnhancedFooter() {
             >
               🐦 @pranshurastogii
             </Link>
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined' && (window as any).activateGardenCursor) {
+                  (window as any).activateGardenCursor()
+                }
+              }}
+              className="
+                px-4 py-2 rounded-full
+                bg-gradient-to-r from-emerald-500 to-teal-500
+                text-white text-sm font-medium
+                hover:from-emerald-600 hover:to-teal-600
+                transform hover:scale-105 transition-all duration-200
+                shadow-lg hover:shadow-xl
+                border border-emerald-400/30
+              "
+            >
+              🌱 Touch Grass
+            </button>
           </div>
         </div>
 

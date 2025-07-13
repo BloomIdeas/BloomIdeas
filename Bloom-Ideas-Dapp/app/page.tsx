@@ -1,305 +1,406 @@
+// app/page.tsx
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, Sparkles, Leaf, Flower2 } from "lucide-react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
+import { supabase } from "@/lib/supabaseClient"
+import { toast } from "sonner"
+
+import {
+  Search,
+  Sparkles,
+  Leaf,
+  Flower2,
+  MessageCircle,
+  Heart as HeartIcon,
+  Slash as NeglectIcon,
+  Tag as TagIcon,
+  User as PersonIcon,
+} from "lucide-react"
+
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import ProfilePopup from "@/components/profile-popup"
 import EnhancedIdeaModal from "@/components/enhanced-idea-modal"
-import SimplifiedIdeaCard from "@/components/simplified-idea-card"
 import UniversalWalletConnection from "@/components/universal-wallet-connection"
 import GardenExplorer from "@/components/garden-explorer"
-import { FloatingGardenElements, SeasonalBackground, GardenWeather } from "@/components/garden-elements"
+import {
+  FloatingGardenElements,
+  SeasonalBackground,
+  GardenWeather,
+} from "@/components/garden-elements"
 import EnhancedFooter from "@/components/EnhancedFooter"
 
-const mockIdeas = [
-  {
-    id: 1,
-    title: "DeFi Garden Protocol",
-    description:
-      "A yield farming protocol that grows your assets like a digital garden. Plant tokens, nurture with liquidity, and harvest rewards.",
-    author: "0x1234...5678",
-    tags: ["DeFi", "Yield Farming", "Protocol", "Governance"],
-    votes: 42,
-    interested: 8,
-    comments: 12,
-    status: "growing",
-    createdAt: "2 days ago",
-    bloomScore: 92,
-  },
-  {
-    id: 2,
-    title: "ZK Bloom Verification",
-    description:
-      "Zero-knowledge proof system for private credential verification with beautiful UI inspired by blooming flowers.",
-    author: "0x9876...5432",
-    tags: ["ZK", "Privacy", "Identity"],
-    votes: 38,
-    interested: 12,
-    comments: 8,
-    status: "planted",
-    createdAt: "1 day ago",
-    bloomScore: 87,
-  },
-  {
-    id: 3,
-    title: "NFT Seed Exchange",
-    description: "Marketplace for trading rare digital seeds that grow into unique NFT artworks over time.",
-    author: "0x5555...7777",
-    tags: ["NFT", "Marketplace", "Art"],
-    votes: 29,
-    interested: 6,
-    comments: 5,
-    status: "planted",
-    createdAt: "3 hours ago",
-    bloomScore: 78,
-  },
-  {
-    id: 4,
-    title: "Garden Governance DAO",
-    description:
-      "Decentralized governance platform for community decision making with garden-themed voting mechanisms.",
-    author: "0x7777...8888",
-    tags: ["DAO", "Governance", "Community"],
-    votes: 56,
-    interested: 15,
-    comments: 18,
-    status: "bloomed",
-    createdAt: "1 week ago",
-    bloomScore: 95,
-  },
-  {
-    id: 5,
-    title: "Cross-Chain Garden Bridge",
-    description: "Bridge protocol for transferring assets between different blockchains with garden-themed interface.",
-    author: "0x3333...4444",
-    tags: ["DeFi", "Cross-Chain", "Bridge"],
-    votes: 35,
-    interested: 9,
-    comments: 7,
-    status: "growing",
-    createdAt: "4 days ago",
-    bloomScore: 83,
-  },
-  {
-    id: 6,
-    title: "Bloom Social Network",
-    description: "Decentralized social platform where connections grow like a garden ecosystem.",
-    author: "0x6666...9999",
-    tags: ["Social", "Web3", "Community"],
-    votes: 24,
-    interested: 11,
-    comments: 9,
-    status: "bloomed",
-    createdAt: "2 weeks ago",
-    bloomScore: 89,
-  },
-]
+type Category = { id: number; name: string }
+type CareAction = "nurture" | "neglect"
 
-const filterOptions = [
-  { id: "all", label: "🌻 All Gardens", emoji: "🌻" },
-  { id: "planted", label: "🌱 Planted Seeds", emoji: "🌱" },
-  { id: "growing", label: "🌿 Growing", emoji: "🌿" },
-  { id: "bloomed", label: "🌸 Bloomed", emoji: "🌸" },
-]
-
-const tags = ["All", "DeFi", "ZK", "NFT", "AI", "DAO", "Social", "Gaming"]
+interface Project {
+  id: number
+  owner_address: string
+  title: string
+  description: string
+  stage: "planted" | "growing" | "bloomed"
+  created_at: string
+  categoryIds: number[]
+  categoryNames: string[]
+  nurtureCount: number
+  neglectCount: number
+  commentCount: number
+  joinCount: number
+  userCareAction?: CareAction
+  bloomUsername?: string | null
+}
 
 export default function HomePage() {
-  const [selectedFilter, setSelectedFilter] = useState("all")
-  const [selectedTag, setSelectedTag] = useState("All")
+  // --- UI state ---
+  const [walletAddress, setWalletAddress] = useState<string>("")
+  const [categories, setCategories] = useState<Category[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedProfile, setSelectedProfile] = useState<string | null>(null)
-  const [selectedIdea, setSelectedIdea] = useState<any>(null)
-  const [isWalletConnected, setIsWalletConnected] = useState(false)
-  const [walletAddress, setWalletAddress] = useState("")
+  const [stageFilter, setStageFilter] = useState<"all"|"planted"|"growing"|"bloomed">("all")
+  const [tagFilter, setTagFilter] = useState<"all"|number>("all")
+  const [selectedProfile, setSelectedProfile] = useState<string|null>(null)
+  const [selectedIdea, setSelectedIdea] = useState<Project| null>(null)
 
-  const handleWalletConnectionChange = (connected: boolean, address?: string) => {
-    setIsWalletConnected(connected)
-    setWalletAddress(address || "")
+  // --- Load everything from Supabase ---
+  async function fetchData() {
+    // 1) categories
+    const { data: cats, error: catsErr } = await supabase
+      .from('categories')
+      .select('id,name')
+      .order('name', { ascending: true })
+    if (catsErr) {
+      console.error(catsErr)
+      return toast.error("Failed to load categories")
+    }
+    setCategories(cats)
+
+    // 2) all the rows we'll need
+    const [
+      { data: prjs, error: prjErr },
+      { data: pcats, error: pcErr },
+      { data: cares, error: cErr },
+      { data: comms, error: comErr },
+      { data: joins, error: jErr },
+      { data: users, error: usersErr },
+    ] = await Promise.all([
+      supabase
+        .from('projects')
+        .select('id,owner_address,title,description,stage,created_at'),
+      supabase
+        .from('project_categories')
+        .select('project_id,category_id'),
+      supabase
+        .from('project_care_actions')
+        .select('project_id,action,user_address'),
+      supabase
+        .from('comments')
+        .select('project_id'),
+      supabase
+        .from('join_requests')
+        .select('project_id'),
+      supabase
+        .from('users')
+        .select('wallet_address,bloom_username'),
+    ])
+
+    if (prjErr || pcErr || cErr || comErr || jErr || usersErr) {
+      console.error(prjErr, pcErr, cErr, comErr, jErr, usersErr)
+      return toast.error("Failed to load garden data")
+    }
+
+    // map categoryId -> name
+    const catMap = new Map(categories.map((c) => [c.id, c.name]))
+    // map wallet_address -> bloom_username
+    const userMap = new Map((users ?? []).map((u) => [u.wallet_address, u.bloom_username]))
+
+    // build full projects array
+    const enriched = (prjs ?? []).map((p) => {
+      const myCats = (pcats ?? []).filter((x) => x.project_id === p.id)
+      const careRows = (cares ?? []).filter((x) => x.project_id === p.id)
+      const userRow = careRows.find((x) => x.user_address === walletAddress)
+
+      const nCount = careRows.filter((x) => x.action === "nurture").length
+      const xCount = careRows.filter((x) => x.action === "neglect").length
+      const cmCount = (comms ?? []).filter((x) => x.project_id === p.id).length
+      const jnCount = (joins ?? []).filter((x) => x.project_id === p.id).length
+
+      const catIds = myCats.map((x) => x.category_id)
+      const catNames = catIds.map((id) => catMap.get(id) ?? "unknown")
+      const bloomUsername = userMap.get(p.owner_address) || null
+
+      return {
+        ...p,
+        categoryIds: catIds,
+        categoryNames: catNames,
+        nurtureCount: nCount,
+        neglectCount: xCount,
+        commentCount: cmCount,
+        joinCount: jnCount,
+        userCareAction: userRow?.action,
+        bloomUsername,
+      }
+    })
+
+    setProjects(enriched)
   }
 
-  const filteredIdeas = mockIdeas.filter((idea) => {
-    const matchesFilter = selectedFilter === "all" || idea.status === selectedFilter
-    const matchesTag = selectedTag === "All" || idea.tags.includes(selectedTag)
-    const matchesSearch =
-      idea.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      idea.description.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesFilter && matchesTag && matchesSearch
-  })
+  // initial load & reload whenever wallet changes
+  useEffect(() => {
+    fetchData()
+  }, [walletAddress])
+
+  // --- care toggle ---
+  async function handleCare(projId: number, action: CareAction) {
+    if (!walletAddress) {
+      return toast.error("Connect your wallet first")
+    }
+    // check existing row
+    const existing = projects.find((p) => p.id === projId)?.userCareAction
+    if (existing === action) {
+      // delete
+      await supabase
+        .from("project_care_actions")
+        .delete()
+        .match({ project_id: projId, user_address: walletAddress })
+    } else {
+      // upsert
+      await supabase
+        .from("project_care_actions")
+        .upsert(
+          { project_id: projId, user_address: walletAddress, action },
+          { onConflict: ["project_id", "user_address"] }
+        )
+    }
+    fetchData()
+  }
+
+  // --- filtering ---
+  const filtered = projects
+    .filter((p) => stageFilter === "all" || p.stage === stageFilter)
+    .filter((p) =>
+      tagFilter === "all" ? true : p.categoryIds.includes(tagFilter as number)
+    )
+    .filter(
+      (p) =>
+        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.description.toLowerCase().includes(searchQuery.toLowerCase())
+    )
 
   return (
     <div className="min-h-screen relative">
-      {/* Seasonal Background */}
       <SeasonalBackground season="spring" />
-
-      {/* Floating Garden Elements */}
       <FloatingGardenElements />
 
-      {/* Header */}
-      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50 relative">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-10 h-10 rounded-full shadow" />
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                  Bloom Ideas
-                </h1>
-                <p className="text-sm text-emerald-600/70">Where hackathon ideas flourish 🌸</p>
-              </div>
+      {/* ================= HEADER (unchanged) ================= */}
+      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Flower2 className="w-8 h-8 text-emerald-500" />
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                Bloom Ideas
+              </h1>
+              <p className="text-sm text-emerald-600/70">
+                Where hackathon ideas flourish 🌸
+              </p>
             </div>
-
-            <div className="flex items-center gap-4">
-              <UniversalWalletConnection onConnectionChange={handleWalletConnectionChange} />
-
-              {isWalletConnected && <GardenExplorer walletAddress={walletAddress} />}
-
-              <Link href="/submit">
-                <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white">
-                  <Leaf className="w-4 h-4 mr-2" />
-                  Plant Idea
-                </Button>
-              </Link>
-            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <UniversalWalletConnection
+              onConnectionChange={(conn, addr) =>
+                conn ? setWalletAddress(addr!) : setWalletAddress("")
+              }
+            />
+            {walletAddress && <GardenExplorer walletAddress={walletAddress} />}
+            <Link href="/submit">
+              <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+                <Leaf className="w-4 h-4 mr-1" /> Plant Idea
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
 
+      {/* ================= MAIN ================= */}
       <main className="container mx-auto px-4 py-8 relative z-10">
-        {/* Hero Section */}
+        {/* — Hero */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-4 py-2 rounded-full mb-6 backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-4 py-2 rounded-full mb-6">
             <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span className="text-emerald-700 font-medium">Cultivating Innovation 🌱</span>
+            <span className="text-emerald-700 font-medium">
+              Cultivating Innovation 🌱
+            </span>
           </div>
           <h2 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
             Digital Garden of Ideas
           </h2>
           <p className="text-xl text-emerald-700/80 max-w-2xl mx-auto mb-6">
-            Plant your ideas, watch them grow, and harvest the future of Web3 innovation together. 🌻
+            Plant your ideas, watch them grow, and harvest the future of Web3
+            innovation together. 🌻
           </p>
-
-          {/* Garden Weather Widget */}
           <div className="max-w-md mx-auto mb-8">
             <GardenWeather />
           </div>
-        </div>
 
-        {/* Search */}
-        <div className="relative max-w-md mx-auto mb-8">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-500 w-5 h-5" />
-          <Input
-            placeholder="Search gardens... 🔍"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400/20 bg-white/80 backdrop-blur-sm"
-          />
-        </div>
+          {/* — Search */}
+          <div className="relative max-w-md mx-auto mb-8">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" />
+            <Input
+              placeholder="Search gardens... 🔍"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 border-emerald-200 focus:border-emerald-400"
+            />
+          </div>
 
-        {/* Garden Filters */}
-        <div className="flex flex-wrap justify-center gap-3 mb-8">
-          {filterOptions.map((filter) => (
+          {/* — Stage Filters */}
+          <div className="flex justify-center gap-3 mb-4">
+            {(["all", "planted", "growing", "bloomed"] as any[]).map((stg) => (
+              <Button
+                key={stg}
+                variant={stageFilter === stg ? "default" : "outline"}
+                onClick={() => setStageFilter(stg)}
+              >
+                {{
+                  all: "🌻 All Gardens",
+                  planted: "🌱 Planted Seeds",
+                  growing: "🌿 Growing",
+                  bloomed: "🌸 Bloomed",
+                }[stg]}
+              </Button>
+            ))}
+          </div>
+
+          {/* — Category Tags */}
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
             <Button
-              key={filter.id}
-              variant={selectedFilter === filter.id ? "default" : "outline"}
-              onClick={() => setSelectedFilter(filter.id)}
-              className={
-                selectedFilter === filter.id
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg"
-                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm"
-              }
-            >
-              {filter.label}
-            </Button>
-          ))}
-        </div>
-
-        {/* Tag Filters */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {tags.map((tag) => (
-            <Button
-              key={tag}
-              variant={selectedTag === tag ? "secondary" : "outline"}
+              variant={tagFilter === "all" ? "secondary" : "outline"}
               size="sm"
-              onClick={() => setSelectedTag(tag)}
-              className={
-                selectedTag === tag
-                  ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm"
-              }
+              onClick={() => setTagFilter("all")}
             >
-              {tag}
+              All
             </Button>
-          ))}
-        </div>
+            {categories.map((c) => (
+              <Button
+                key={c.id}
+                variant={tagFilter === c.id ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setTagFilter(c.id)}
+              >
+                {c.name}
+              </Button>
+            ))}
+          </div>
 
-        {/* Results Count with Garden Emoji */}
-        <div className="text-center mb-6">
-          <p className="text-emerald-600/70">
-            🌺 Found {filteredIdeas.length} beautiful garden{filteredIdeas.length !== 1 ? "s" : ""}
-            {selectedFilter !== "all" &&
-              ` in ${filterOptions.find((f) => f.id === selectedFilter)?.label.toLowerCase()}`}{" "}
-            🌺
+          <p className="text-center text-emerald-600/70 mb-6">
+            🌺 Found {filtered.length} beautiful garden
+            {filtered.length !== 1 ? "s" : ""} 🌺
           </p>
         </div>
 
-        {/* Ideas Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
-          {filteredIdeas.map((idea) => (
-            <SimplifiedIdeaCard
+        {/* — Garden Cards Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((idea) => (
+            <div
               key={idea.id}
-              idea={idea}
-              onViewDetails={setSelectedIdea}
-              onProfileClick={setSelectedProfile}
-            />
+              className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg hover:shadow-2xl transform hover:scale-[1.02] transition"
+            >
+              <div className="p-5 space-y-4">
+                <div className="flex justify-between items-start">
+                  <h3 className="text-lg font-semibold text-emerald-900">
+                    {idea.title}
+                  </h3>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                      {
+                        planted: "bg-yellow-100 text-yellow-700",
+                        growing: "bg-emerald-100 text-emerald-700",
+                        bloomed: "bg-pink-100 text-pink-700",
+                      }[idea.stage]
+                    }`}
+                  >
+                    {idea.stage}
+                  </span>
+                </div>
+                {/* Owner username display */}
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs text-emerald-500 font-semibold tracking-wide uppercase mr-1">Planted by</span>
+                  <span className={`font-bold text-base rounded px-2 py-1 shadow-sm ${idea.bloomUsername ? 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700' : 'bg-yellow-50 text-gray-400 italic border border-yellow-200'}`}
+                  >
+                    {idea.bloomUsername ? `@${idea.bloomUsername}` : 'Unknown Planter'}
+                  </span>
+                </div>
+
+                <div className="prose prose-emerald line-clamp-3">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {idea.description}
+                  </ReactMarkdown>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {idea.categoryNames.map((cat) => (
+                    <span
+                      key={cat}
+                      className="flex items-center bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs"
+                    >
+                      <TagIcon className="w-3 h-3 mr-1" /> {cat}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-6 text-sm mt-3">
+                  <button
+                    onClick={() => handleCare(idea.id, "nurture")}
+                    title="🌱 Nurture this garden"
+                    className="flex items-center gap-1 text-rose-500 hover:text-rose-600 transition"
+                  >
+                    <HeartIcon size={16} /> {idea.nurtureCount}
+                  </button>
+                  <button
+                    onClick={() => handleCare(idea.id, "neglect")}
+                    title="❌ Neglect this garden"
+                    className="flex items-center gap-1 text-gray-500 hover:text-gray-600 transition"
+                  >
+                    <NeglectIcon size={16} /> {idea.neglectCount}
+                  </button>
+                  <div className="flex items-center gap-1 text-blue-500">
+                    <PersonIcon size={16} /> {idea.joinCount}
+                  </div>
+                  <div className="flex items-center gap-1 text-green-500">
+                    <MessageCircle size={16} /> {idea.commentCount}
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => setSelectedIdea(idea)}
+                  className="w-full mt-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+                >
+                  ✨ Explore Garden
+                </Button>
+              </div>
+            </div>
           ))}
         </div>
-
-        {/* Load More */}
-        {filteredIdeas.length > 0 && (
-          <div className="text-center">
-            <Button
-              variant="outline"
-              size="lg"
-              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm shadow-lg"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Discover More Gardens 🌻
-            </Button>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {filteredIdeas.length === 0 && (
-          <div className="text-center py-12">
-            <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-              <Flower2 className="w-12 h-12 text-emerald-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-emerald-900 mb-2">No Gardens Found 🌱</h3>
-            <p className="text-emerald-600/70 mb-6">
-              The garden is waiting for your seeds! Plant the first idea in this category! 🌸
-            </p>
-            <Link href="/submit">
-              <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white">
-                <Leaf className="w-4 h-4 mr-2" />
-                Plant First Seed 🌱
-              </Button>
-            </Link>
-          </div>
-        )}
-
-        {/* Enhanced Footer */}
-        <EnhancedFooter />
       </main>
 
-      {selectedProfile && <ProfilePopup address={selectedProfile} onClose={() => setSelectedProfile(null)} />}
+      {/* ================= FOOTER ================= */}
+      <EnhancedFooter />
+
+      {/* ================= POPUPS ================= */}
+      {selectedProfile && (
+        <ProfilePopup
+          address={selectedProfile}
+          onClose={() => setSelectedProfile(null)}
+        />
+      )}
       {selectedIdea && (
         <EnhancedIdeaModal
-          idea={selectedIdea}
+          idea={{ ...selectedIdea, bloomUsername: selectedIdea.bloomUsername || "" }}
           onClose={() => setSelectedIdea(null)}
-          onProfileClick={setSelectedProfile}
+          onProfileClick={(addr) => setSelectedProfile(addr)}
         />
       )}
     </div>

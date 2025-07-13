@@ -6,10 +6,12 @@ import { Flower2, Leaf, Sparkles } from "lucide-react"
 // Floating Garden Elements
 export function FloatingGardenElements() {
   const [elements, setElements] = useState<Array<{ id: number; x: number; y: number; type: string }>>([])
+  const [showCustomCursor, setShowCustomCursor] = useState(false)
+  const [cursorElement, setCursorElement] = useState<string>("flower")
 
   useEffect(() => {
     const generateElements = () => {
-      const newElements = Array.from({ length: 8 }, (_, i) => ({
+      const newElements = Array.from({ length: 48 }, (_, i) => ({ // Increased from 8 to 48 (6x more)
         id: i,
         x: Math.random() * 100,
         y: Math.random() * 100,
@@ -22,6 +24,80 @@ export function FloatingGardenElements() {
     const interval = setInterval(generateElements, 10000) // Regenerate every 10 seconds
 
     return () => clearInterval(interval)
+  }, [])
+
+  // Change cursor element every 3 seconds when custom cursor is active
+  useEffect(() => {
+    if (!showCustomCursor) return
+
+    const cursorInterval = setInterval(() => {
+      const types = ["flower", "leaf", "sparkle"]
+      setCursorElement(types[Math.floor(Math.random() * types.length)])
+    }, 5000)
+
+    return () => clearInterval(cursorInterval)
+  }, [showCustomCursor])
+
+  // Handle mouse movement for custom cursor when active
+  useEffect(() => {
+    if (!showCustomCursor) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const cursor = document.querySelector('.custom-cursor') as HTMLElement
+      if (cursor) {
+        cursor.style.left = e.clientX + 'px'
+        cursor.style.top = e.clientY + 'px'
+      }
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    return () => document.removeEventListener('mousemove', handleMouseMove)
+  }, [showCustomCursor])
+
+  // Handle double click to spawn new elements
+  useEffect(() => {
+    const handleDoubleClick = (e: MouseEvent) => {
+      const x = (e.clientX / window.innerWidth) * 100
+      const y = (e.clientY / window.innerHeight) * 100
+      
+      const newElement = {
+        id: Date.now() + Math.random(),
+        x,
+        y,
+        type: ["flower", "leaf", "sparkle"][Math.floor(Math.random() * 3)],
+      }
+      
+      setElements(prev => [...prev, newElement])
+      
+      // Remove the spawned element after 5 seconds
+      setTimeout(() => {
+        setElements(prev => prev.filter(el => el.id !== newElement.id))
+      }, 5000)
+    }
+
+    document.addEventListener('dblclick', handleDoubleClick)
+    return () => document.removeEventListener('dblclick', handleDoubleClick)
+  }, [])
+
+  // Function to activate custom cursor for 30 seconds
+  const activateCustomCursor = () => {
+    setShowCustomCursor(true)
+    setTimeout(() => {
+      setShowCustomCursor(false)
+    }, 10000) // 30 seconds
+  }
+
+  // Expose the function globally for the footer button
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).activateGardenCursor = activateCustomCursor
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).activateGardenCursor
+      }
+    }
   }, [])
 
   const getIcon = (type: string) => {
@@ -37,23 +113,73 @@ export function FloatingGardenElements() {
     }
   }
 
+  const getCursorIcon = (type: string) => {
+    switch (type) {
+      case "flower":
+        return "🌸"
+      case "leaf":
+        return "🍃"
+      case "sparkle":
+        return "✨"
+      default:
+        return "🌸"
+    }
+  }
+
   return (
-    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-      {elements.map((element) => (
-        <div
-          key={element.id}
-          className="absolute animate-float opacity-20"
+    <>
+      {/* Custom cursor styles - only when active */}
+      {showCustomCursor && (
+        <style jsx global>{`
+          body {
+            cursor: none;
+          }
+          * {
+            cursor: none !important;
+          }
+          .custom-cursor {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            font-size: 20px;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s ease;
+            text-shadow: 0 0 10px rgba(0,0,0,0.3);
+          }
+        `}</style>
+      )}
+      
+      {/* Custom cursor element - only when active */}
+      {showCustomCursor && (
+        <div 
+          className="custom-cursor"
           style={{
-            left: `${element.x}%`,
-            top: `${element.y}%`,
-            animationDelay: `${element.id * 0.5}s`,
-            animationDuration: `${3 + Math.random() * 2}s`,
+            left: '0px',
+            top: '0px',
           }}
         >
-          {getIcon(element.type)}
+          {getCursorIcon(cursorElement)}
         </div>
-      ))}
-    </div>
+      )}
+
+      {/* Floating elements */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        {elements.map((element) => (
+          <div
+            key={element.id}
+            className="absolute animate-float opacity-20"
+            style={{
+              left: `${element.x}%`,
+              top: `${element.y}%`,
+              animationDelay: `${element.id * 0.5}s`,
+              animationDuration: `${3 + Math.random() * 2}s`,
+            }}
+          >
+            {getIcon(element.type)}
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
