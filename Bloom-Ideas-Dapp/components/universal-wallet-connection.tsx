@@ -12,13 +12,16 @@ import { useAccount, useBalance, useChainId, useDisconnect } from 'wagmi'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { formatUnits } from 'viem'
 import { mainnet, sepolia, polygon } from 'viem/chains'
+import MessageSigningModal from './message-signing-modal'
 
 interface UniversalWalletConnectionProps {
   onConnectionChange?: (isConnected: boolean, address?: string) => void
+  onSignatureVerified?: (address: string, signature: string) => void
 }
 
 export default function UniversalWalletConnection({
   onConnectionChange,
+  onSignatureVerified,
 }: UniversalWalletConnectionProps) {
   const [isMounted, setIsMounted] = useState(false)
   const { address, isConnected } = useAccount()
@@ -27,6 +30,8 @@ export default function UniversalWalletConnection({
   const { openConnectModal } = useConnectModal()
   const { data: balanceData } = useBalance({ address, chainId })
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showSigningModal, setShowSigningModal] = useState(false)
+  const [hasVerifiedSignature, setHasVerifiedSignature] = useState(false)
 
   // Get chain info from chainId
   const getChainInfo = (id: number) => {
@@ -49,10 +54,30 @@ export default function UniversalWalletConnection({
   }, [])
 
   useEffect(() => {
-    if (isMounted) {
-      onConnectionChange?.(isConnected, address)
+    if (isMounted && isConnected && address && !hasVerifiedSignature) {
+      // Show signing modal when wallet connects
+      setShowSigningModal(true)
     }
-  }, [isMounted, isConnected, address, onConnectionChange])
+  }, [isMounted, isConnected, address, hasVerifiedSignature])
+
+  useEffect(() => {
+    if (isMounted) {
+      onConnectionChange?.(isConnected && hasVerifiedSignature, address)
+    }
+  }, [isMounted, isConnected, hasVerifiedSignature, address, onConnectionChange])
+
+  const handleSignSuccess = (signature: string) => {
+    setHasVerifiedSignature(true)
+    setShowSigningModal(false)
+    onSignatureVerified?.(address!, signature)
+  }
+
+  const handleSignReject = () => {
+    setShowSigningModal(false)
+    // Disconnect wallet if user rejects signing
+    disconnect()
+    toast.error("Wallet disconnected - signature required to access the garden")
+  }
 
   if (!isMounted) return null
 
@@ -65,6 +90,17 @@ export default function UniversalWalletConnection({
       >
         Connect Wallet
       </Button>
+    )
+  }
+
+  // Show signing modal if connected but not verified
+  if (showSigningModal && address) {
+    return (
+      <MessageSigningModal
+        address={address}
+        onSignSuccess={handleSignSuccess}
+        onSignReject={handleSignReject}
+      />
     )
   }
 
@@ -171,7 +207,7 @@ export default function UniversalWalletConnection({
               )}
               <Button
                 variant="ghost"
-                onClick={() => { disconnect(); setShowDropdown(false); }}
+                onClick={() => { disconnect(); setShowDropdown(false); setHasVerifiedSignature(false); }}
                 className="w-full justify-start text-red-600 hover:bg-red-50"
               >
                 <LogOut className="w-4 h-4 mr-2" />
