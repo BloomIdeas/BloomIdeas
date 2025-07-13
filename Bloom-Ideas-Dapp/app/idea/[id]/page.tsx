@@ -22,6 +22,7 @@ import Link from "next/link"
 import { Progress } from "@/components/ui/progress"
 import ProfilePopup from "@/components/profile-popup"
 import UniversalWalletConnection from "@/components/universal-wallet-connection"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 const mockIdea = {
   id: 1,
@@ -181,23 +182,24 @@ export default function IdeaDetailPage() {
   const [isInterested, setIsInterested] = useState(false)
   const [newComment, setNewComment] = useState("")
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null)
+  const isMobile = useIsMobile()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       {/* Header */}
       <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3 md:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               <Link href="/">
-                <Button variant="ghost" size="sm" className="text-emerald-700 hover:bg-emerald-50">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Garden
+                <Button variant="ghost" size={isMobile ? "sm" : "sm"} className="text-emerald-700 hover:bg-emerald-50">
+                  <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                  {isMobile ? "Back" : "Back to Garden"}
                 </Button>
               </Link>
-              <div className="flex items-center gap-3">
-                <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-8 h-8 rounded-full shadow" />
-                <span className="font-semibold text-emerald-800">Bloom Ideas</span>
+              <div className="flex items-center gap-2 md:gap-3">
+                <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-6 h-6 md:w-8 md:h-8 rounded-full shadow" />
+                <span className="font-semibold text-emerald-800 text-sm md:text-base">Bloom Ideas</span>
               </div>
             </div>
             <UniversalWalletConnection />
@@ -205,32 +207,32 @@ export default function IdeaDetailPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-8 lg:grid-cols-3">
+      <main className="container mx-auto px-4 py-4 md:py-8">
+        <div className="grid gap-6 md:gap-8 lg:grid-cols-3">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 md:space-y-6">
             {/* Idea Header */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
               <div className="h-2 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400"></div>
-              <CardHeader>
+              <CardHeader className="pb-3 md:pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-emerald-900 mb-3">{mockIdea.title}</h1>
+                    <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-emerald-900 mb-2 md:mb-3">{mockIdea.title}</h1>
                     <button
                       onClick={() => setSelectedProfile(mockIdea.author)}
-                      className="flex items-center gap-3 text-sm text-emerald-600/70 mb-4 hover:bg-emerald-50 rounded-lg p-2 transition-colors"
+                      className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-emerald-600/70 mb-3 md:mb-4 hover:bg-emerald-50 rounded-lg p-2 transition-colors"
                     >
-                      <Avatar className="w-6 h-6">
+                      <Avatar className="w-5 h-5 md:w-6 md:h-6">
                         <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">GT</AvatarFallback>
                       </Avatar>
                       <span className="font-medium">{mockIdea.authorName}</span>
-                      <span>({mockIdea.author})</span>
+                      <span className="hidden sm:inline">({mockIdea.author})</span>
                       <span>•</span>
                       <span>{mockIdea.createdAt}</span>
                     </button>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1 md:gap-2">
                       {mockIdea.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="bg-emerald-100 text-emerald-700">
+                        <Badge key={tag} variant="secondary" className="bg-emerald-100 text-emerald-700 text-xs">
                           {tag}
                         </Badge>
                       ))}
@@ -243,18 +245,18 @@ export default function IdeaDetailPage() {
             {/* Development Status */}
             {mockIdea.inDevelopment && (
               <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="font-medium text-green-800">🌱 Currently Growing</span>
+                <CardContent className="p-3 md:p-4">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="font-medium text-green-800 text-sm md:text-base">🌱 Currently Growing</span>
                     <Link href={mockIdea.githubRepo} className="ml-auto">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-green-200 text-green-700 hover:bg-green-50 bg-transparent"
+                        className="border-green-200 text-green-700 hover:bg-green-50 bg-transparent text-xs"
                       >
-                        <Github className="w-4 h-4 mr-2" />
-                        View Repository
+                        <Github className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                        {isMobile ? "Repo" : "View Repository"}
                       </Button>
                     </Link>
                   </div>
@@ -264,13 +266,13 @@ export default function IdeaDetailPage() {
 
             {/* Description */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-emerald-900">About This Idea</h2>
+              <CardHeader className="pb-3 md:pb-4">
+                <h2 className="text-lg md:text-xl font-semibold text-emerald-900">About This Idea</h2>
               </CardHeader>
               <CardContent>
                 <div className="prose prose-emerald max-w-none">
                   {mockIdea.description.split("\n").map((paragraph, index) => (
-                    <p key={index} className="text-emerald-800/90 mb-4 last:mb-0">
+                    <p key={index} className="text-emerald-800/90 mb-3 md:mb-4 last:mb-0 text-sm md:text-base">
                       {paragraph}
                     </p>
                   ))}
@@ -280,20 +282,20 @@ export default function IdeaDetailPage() {
 
             {/* Enhanced Features */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-emerald-900">🚀 Project Details</h2>
+              <CardHeader className="pb-3 md:pb-4">
+                <h2 className="text-lg md:text-xl font-semibold text-emerald-900">🚀 Project Details</h2>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 md:space-y-6">
                 {/* Funding Progress */}
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium text-emerald-800">Community Funding</span>
-                    <span className="text-sm text-emerald-600">
+                    <span className="font-medium text-emerald-800 text-sm md:text-base">Community Funding</span>
+                    <span className="text-xs md:text-sm text-emerald-600">
                       ${mockIdea.funding.raised.toLocaleString()} / ${mockIdea.funding.target.toLocaleString()}
                     </span>
                   </div>
-                  <Progress value={(mockIdea.funding.raised / mockIdea.funding.target) * 100} className="h-3 mb-2" />
-                  <div className="flex justify-between text-sm text-emerald-600/70">
+                  <Progress value={(mockIdea.funding.raised / mockIdea.funding.target) * 100} className="h-2 md:h-3 mb-2" />
+                  <div className="flex justify-between text-xs md:text-sm text-emerald-600/70">
                     <span>{mockIdea.funding.backers} backers</span>
                     <span>{Math.round((mockIdea.funding.raised / mockIdea.funding.target) * 100)}% funded</span>
                   </div>
@@ -301,10 +303,10 @@ export default function IdeaDetailPage() {
 
                 {/* Supported Chains */}
                 <div>
-                  <h3 className="font-medium text-emerald-800 mb-3">Supported Chains</h3>
-                  <div className="flex flex-wrap gap-2">
+                  <h3 className="font-medium text-emerald-800 mb-2 md:mb-3 text-sm md:text-base">Supported Chains</h3>
+                  <div className="flex flex-wrap gap-1 md:gap-2">
                     {mockIdea.chains.map((chain) => (
-                      <Badge key={chain} variant="outline" className="border-blue-200 text-blue-700">
+                      <Badge key={chain} variant="outline" className="border-blue-200 text-blue-700 text-xs">
                         {chain}
                       </Badge>
                     ))}
@@ -313,12 +315,12 @@ export default function IdeaDetailPage() {
 
                 {/* Milestones */}
                 <div>
-                  <h3 className="font-medium text-emerald-800 mb-3">Development Milestones</h3>
-                  <div className="space-y-3">
+                  <h3 className="font-medium text-emerald-800 mb-2 md:mb-3 text-sm md:text-base">Development Milestones</h3>
+                  <div className="space-y-2 md:space-y-3">
                     {mockIdea.milestones.map((milestone, index) => (
-                      <div key={index} className="flex items-center gap-3">
+                      <div key={index} className="flex items-center gap-2 md:gap-3">
                         <div
-                          className={`w-4 h-4 rounded-full ${
+                          className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${
                             milestone.status === "completed"
                               ? "bg-green-500"
                               : milestone.status === "in-progress"
@@ -326,19 +328,19 @@ export default function IdeaDetailPage() {
                                 : "bg-gray-300"
                           }`}
                         />
-                        <div className="flex-1">
-                          <span className="text-emerald-900 font-medium">{milestone.name}</span>
-                          <span className="text-sm text-emerald-600/70 ml-2">({milestone.date})</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-emerald-900 font-medium text-sm md:text-base">{milestone.name}</span>
+                          <span className="text-xs md:text-sm text-emerald-600/70 ml-1 md:ml-2">({milestone.date})</span>
                         </div>
                         <Badge
                           variant="outline"
-                          className={
+                          className={`text-xs ${
                             milestone.status === "completed"
                               ? "border-green-200 text-green-700"
                               : milestone.status === "in-progress"
                                 ? "border-yellow-200 text-yellow-700"
                                 : "border-gray-200 text-gray-700"
-                          }
+                          }`}
                         >
                           {milestone.status}
                         </Badge>
@@ -348,20 +350,22 @@ export default function IdeaDetailPage() {
                 </div>
 
                 {/* Links */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
                   <Button
                     variant="outline"
-                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
+                    size="sm"
+                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent text-xs md:text-sm"
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Live Demo
+                    <ExternalLink className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                    {isMobile ? "Demo" : "Live Demo"}
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
+                    size="sm"
+                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent text-xs md:text-sm"
                   >
-                    <Github className="w-4 h-4 mr-2" />
-                    Repository
+                    <Github className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                    {isMobile ? "Repo" : "Repository"}
                   </Button>
                 </div>
               </CardContent>
@@ -369,25 +373,25 @@ export default function IdeaDetailPage() {
 
             {/* Full Description */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-emerald-900">📖 Detailed Overview</h2>
+              <CardHeader className="pb-3 md:pb-4">
+                <h2 className="text-lg md:text-xl font-semibold text-emerald-900">📖 Detailed Overview</h2>
               </CardHeader>
               <CardContent>
                 <div className="prose prose-emerald max-w-none">
-                  <div className="whitespace-pre-wrap text-emerald-800/90">{mockIdea.fullDescription}</div>
+                  <div className="whitespace-pre-wrap text-emerald-800/90 text-sm md:text-base">{mockIdea.fullDescription}</div>
                 </div>
               </CardContent>
             </Card>
 
             {/* Tech Stack */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-emerald-900">Tech Stack</h2>
+              <CardHeader className="pb-3 md:pb-4">
+                <h2 className="text-lg md:text-xl font-semibold text-emerald-900">Tech Stack</h2>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1 md:gap-2">
                   {mockIdea.techStack.map((tech) => (
-                    <Badge key={tech} variant="outline" className="border-emerald-200 text-emerald-700">
+                    <Badge key={tech} variant="outline" className="border-emerald-200 text-emerald-700 text-xs">
                       {tech}
                     </Badge>
                   ))}
@@ -397,42 +401,42 @@ export default function IdeaDetailPage() {
 
             {/* Comments */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-emerald-900">Community Feedback</h2>
+              <CardHeader className="pb-3 md:pb-4">
+                <h2 className="text-lg md:text-xl font-semibold text-emerald-900">Community Feedback</h2>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 md:space-y-6">
                 {/* Add Comment */}
-                <div className="space-y-3">
+                <div className="space-y-2 md:space-y-3">
                   <Textarea
                     placeholder="Share your thoughts on this blooming idea..."
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    className="border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400/20"
+                    className="border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400/20 text-sm md:text-base"
                   />
-                  <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white">
-                    <MessageCircle className="w-4 h-4 mr-2" />
+                  <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-sm md:text-base">
+                    <MessageCircle className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
                     Add Feedback
                   </Button>
                 </div>
 
                 {/* Comments List */}
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4">
                   {mockComments.map((comment) => (
-                    <div key={comment.id} className="border-l-2 border-emerald-200 pl-4 py-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Avatar className="w-5 h-5">
+                    <div key={comment.id} className="border-l-2 border-emerald-200 pl-3 md:pl-4 py-2">
+                      <div className="flex items-center gap-1 md:gap-2 mb-1 md:mb-2">
+                        <Avatar className="w-4 h-4 md:w-5 md:h-5">
                           <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">
                             {comment.authorName.slice(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium text-emerald-800">{comment.authorName}</span>
-                        <span className="text-sm text-emerald-600/70">•</span>
-                        <span className="text-sm text-emerald-600/70">{comment.createdAt}</span>
+                        <span className="font-medium text-emerald-800 text-sm md:text-base">{comment.authorName}</span>
+                        <span className="text-xs md:text-sm text-emerald-600/70">•</span>
+                        <span className="text-xs md:text-sm text-emerald-600/70">{comment.createdAt}</span>
                       </div>
-                      <p className="text-emerald-800/90 mb-2">{comment.content}</p>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="ghost" className="text-emerald-600 hover:bg-emerald-50 h-6 px-2">
-                          <Heart className="w-3 h-3 mr-1" />
+                      <p className="text-emerald-800/90 mb-1 md:mb-2 text-sm md:text-base">{comment.content}</p>
+                      <div className="flex items-center gap-1 md:gap-2">
+                        <Button size="sm" variant="ghost" className="text-emerald-600 hover:bg-emerald-50 h-5 md:h-6 px-1 md:px-2">
+                          <Heart className="w-2 h-2 md:w-3 md:h-3 mr-1" />
                           {comment.votes}
                         </Button>
                       </div>
@@ -444,27 +448,27 @@ export default function IdeaDetailPage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* Actions */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h3 className="font-semibold text-emerald-900">Take Action</h3>
+              <CardHeader className="pb-3 md:pb-4">
+                <h3 className="font-semibold text-emerald-900 text-sm md:text-base">Take Action</h3>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 md:space-y-3">
                 <Button
-                  className={`w-full ${hasVoted ? "bg-rose-500 hover:bg-rose-600" : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"} text-white`}
+                  className={`w-full text-sm md:text-base ${hasVoted ? "bg-rose-500 hover:bg-rose-600" : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"} text-white`}
                   onClick={() => setHasVoted(!hasVoted)}
                 >
-                  <Heart className={`w-4 h-4 mr-2 ${hasVoted ? "fill-current" : ""}`} />
+                  <Heart className={`w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 ${hasVoted ? "fill-current" : ""}`} />
                   {hasVoted ? "Loved!" : "Love This Idea"}
                 </Button>
 
                 <Button
                   variant="outline"
-                  className={`w-full ${isInterested ? "border-green-500 text-green-700 bg-green-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}
+                  className={`w-full text-sm md:text-base ${isInterested ? "border-green-500 text-green-700 bg-green-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}
                   onClick={() => setIsInterested(!isInterested)}
                 >
-                  <Leaf className="w-4 h-4 mr-2" />
+                  <Leaf className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
                   {isInterested ? "Growing This!" : "I Want to Build This"}
                 </Button>
               </CardContent>
@@ -472,77 +476,77 @@ export default function IdeaDetailPage() {
 
             {/* Enhanced Stats */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h3 className="font-semibold text-emerald-900">🌟 Garden Metrics</h3>
+              <CardHeader className="pb-3 md:pb-4">
+                <h3 className="font-semibold text-emerald-900 text-sm md:text-base">🌟 Garden Metrics</h3>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 md:space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-emerald-700">
-                    <Heart className="w-4 h-4 text-rose-500" />
-                    <span>Community Love</span>
+                  <div className="flex items-center gap-1 md:gap-2 text-emerald-700">
+                    <Heart className="w-3 h-3 md:w-4 md:h-4 text-rose-500" />
+                    <span className="text-xs md:text-sm">Community Love</span>
                   </div>
-                  <span className="font-semibold text-emerald-900">{mockIdea.votes}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockIdea.votes}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-emerald-700">
-                    <Users className="w-4 h-4 text-blue-500" />
-                    <span>Builders Interested</span>
+                  <div className="flex items-center gap-1 md:gap-2 text-emerald-700">
+                    <Users className="w-3 h-3 md:w-4 md:h-4 text-blue-500" />
+                    <span className="text-xs md:text-sm">Builders Interested</span>
                   </div>
-                  <span className="font-semibold text-emerald-900">{mockIdea.interested}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockIdea.interested}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-emerald-700">
-                    <MessageCircle className="w-4 h-4 text-green-500" />
-                    <span>Garden Discussions</span>
+                  <div className="flex items-center gap-1 md:gap-2 text-emerald-700">
+                    <MessageCircle className="w-3 h-3 md:w-4 md:h-4 text-green-500" />
+                    <span className="text-xs md:text-sm">Garden Discussions</span>
                   </div>
-                  <span className="font-semibold text-emerald-900">{mockComments.length}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockComments.length}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-emerald-700">
-                    <Zap className="w-4 h-4 text-yellow-500" />
-                    <span>Hot Score</span>
+                  <div className="flex items-center gap-1 md:gap-2 text-emerald-700">
+                    <Zap className="w-3 h-3 md:w-4 md:h-4 text-yellow-500" />
+                    <span className="text-xs md:text-sm">Hot Score</span>
                   </div>
-                  <span className="font-semibold text-emerald-900">{mockIdea.hotScore}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockIdea.hotScore}</span>
                 </div>
-                <div className="pt-3 border-t border-emerald-100">
-                  <div className="flex justify-between text-sm text-emerald-600/70 mb-2">
+                <div className="pt-2 md:pt-3 border-t border-emerald-100">
+                  <div className="flex justify-between text-xs md:text-sm text-emerald-600/70 mb-1 md:mb-2">
                     <span>Growth Progress</span>
                     <span>{mockIdea.developmentProgress}%</span>
                   </div>
-                  <Progress value={mockIdea.developmentProgress} className="h-2" />
+                  <Progress value={mockIdea.developmentProgress} className="h-1.5 md:h-2" />
                 </div>
               </CardContent>
             </Card>
 
             {/* Similar Ideas */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h3 className="font-semibold text-emerald-900">Related Blooms</h3>
+              <CardHeader className="pb-3 md:pb-4">
+                <h3 className="font-semibold text-emerald-900 text-sm md:text-base">Related Blooms</h3>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2 md:space-y-3">
                 <Link
                   href="/idea/2"
-                  className="block p-3 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors"
+                  className="block p-2 md:p-3 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors"
                 >
-                  <h4 className="font-medium text-emerald-900 mb-1">ZK Bloom Verification</h4>
-                  <p className="text-sm text-emerald-700/80">Privacy-focused credential system</p>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-emerald-600">
-                    <Heart className="w-3 h-3" />
+                  <h4 className="font-medium text-emerald-900 mb-1 text-sm md:text-base">ZK Bloom Verification</h4>
+                  <p className="text-xs md:text-sm text-emerald-700/80">Privacy-focused credential system</p>
+                  <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2 text-xs text-emerald-600">
+                    <Heart className="w-2 h-2 md:w-3 md:h-3" />
                     <span>38</span>
-                    <Users className="w-3 h-3 ml-2" />
+                    <Users className="w-2 h-2 md:w-3 md:h-3 ml-1 md:ml-2" />
                     <span>12</span>
                   </div>
                 </Link>
                 <Link
                   href="/idea/3"
-                  className="block p-3 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors"
+                  className="block p-2 md:p-3 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors"
                 >
-                  <h4 className="font-medium text-emerald-900 mb-1">NFT Seed Exchange</h4>
-                  <p className="text-sm text-emerald-700/80">Growing NFT marketplace</p>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-emerald-600">
-                    <Heart className="w-3 h-3" />
+                  <h4 className="font-medium text-emerald-900 mb-1 text-sm md:text-base">NFT Seed Exchange</h4>
+                  <p className="text-xs md:text-sm text-emerald-700/80">Growing NFT marketplace</p>
+                  <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2 text-xs text-emerald-600">
+                    <Heart className="w-2 h-2 md:w-3 md:h-3" />
                     <span>29</span>
-                    <Users className="w-3 h-3 ml-2" />
+                    <Users className="w-2 h-2 md:w-3 md:h-3 ml-1 md:ml-2" />
                     <span>6</span>
                   </div>
                 </Link>

@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ interface TechStack { id: number; name: string }
 
 export default function SubmitIdeaPage() {
   const router = useRouter()
+  const isMobile = useIsMobile()
 
   // Loaded from Supabase
   const [categories, setCategories] = useState<Category[]>([])
@@ -192,41 +194,46 @@ export default function SubmitIdeaPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
+      <SeasonalBackground season="spring" />
+      <FloatingGardenElements />
+      
       {/* Header */}
       <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="sm" className="text-emerald-700 hover:bg-emerald-50">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Garden
-              </Button>
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-                <Flower2 className="w-5 h-5 text-white" />
+        <div className="container mx-auto px-4 py-3 md:py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 md:gap-4">
+              <Link href="/">
+                <Button variant="ghost" size={isMobile ? "sm" : "sm"} className="text-emerald-700 hover:bg-emerald-50">
+                  <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                  {isMobile ? "Back" : "Back to Garden"}
+                </Button>
+              </Link>
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
+                  <Flower2 className="w-3 h-3 md:w-5 md:h-5 text-white" />
+                </div>
+                <span className="font-semibold text-emerald-800 text-sm md:text-base">Plant New Idea</span>
               </div>
-              <span className="font-semibold text-emerald-800">Plant New Idea</span>
             </div>
+            <UniversalWalletConnection onConnectionChange={handleWalletConnectionChange} />
           </div>
-          <UniversalWalletConnection onConnectionChange={handleWalletConnectionChange} />
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-4 md:py-8 max-w-4xl relative z-10">
         {/* Hero */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-4 py-2 rounded-full mb-4">
-            <Sparkles className="w-4 h-4 text-emerald-600" />
-            <span className="text-emerald-700 font-medium">Plant Your Vision</span>
+        <div className="text-center mb-6 md:mb-8">
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-3 md:px-4 py-2 rounded-full mb-3 md:mb-4">
+            <Sparkles className="w-3 h-3 md:w-4 md:h-4 text-emerald-600" />
+            <span className="text-sm md:text-base text-emerald-700 font-medium">Plant Your Vision</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold mb-3 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 md:mb-3 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
             Share Your Blooming Idea
           </h1>
-          <p className="text-emerald-700/80 max-w-2xl mx-auto">
+          <p className="text-sm md:text-base text-emerald-700/80 max-w-2xl mx-auto px-4">
             Every great innovation starts as a seed. Plant your idea in our garden and watch the community help it grow.
           </p>
-          <div className="max-w-md mx-auto mt-6">
+          <div className="max-w-md mx-auto mt-4 md:mt-6">
             <GardenWeather />
           </div>
         </div>
@@ -234,14 +241,14 @@ export default function SubmitIdeaPage() {
         {/* Form */}
         <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
           <div className="h-2 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400"></div>
-          <CardHeader>
-            <h2 className="text-xl font-semibold text-emerald-900">Idea Details</h2>
-            <p className="text-emerald-700/70">Fill in the details to help your idea flourish</p>
+          <CardHeader className="pb-4 md:pb-6">
+            <h2 className="text-lg md:text-xl font-semibold text-emerald-900">Idea Details</h2>
+            <p className="text-sm md:text-base text-emerald-700/70">Fill in the details to help your idea flourish</p>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 md:space-y-6">
             {/* Title */}
             <div>
-              <Label htmlFor="title" className="text-emerald-800 font-medium">
+              <Label htmlFor="title" className="text-emerald-800 font-medium text-sm md:text-base">
                 Project Title *
               </Label>
               <Input
@@ -249,19 +256,19 @@ export default function SubmitIdeaPage() {
                 placeholder="Give your idea a memorable name..."
                 value={formData.title}
                 onChange={(e) => setFormData((f) => ({ ...f, title: e.target.value }))}
-                className="border-emerald-200 focus:border-emerald-400"
+                className="border-emerald-200 focus:border-emerald-400 mt-1 md:mt-2"
               />
             </div>
 
             {/* Description */}
             <div>
-              <Label htmlFor="description" className="text-emerald-800 font-medium">
+              <Label htmlFor="description" className="text-emerald-800 font-medium text-sm md:text-base">
                 Description *
               </Label>
               <Tabs defaultValue="edit" className="w-full mt-2">
                 <TabsList className="bg-emerald-50 mb-2">
-                  <TabsTrigger value="edit">Edit</TabsTrigger>
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
+                  <TabsTrigger value="edit" className="text-xs md:text-sm">Edit</TabsTrigger>
+                  <TabsTrigger value="preview" className="text-xs md:text-sm">Preview</TabsTrigger>
                 </TabsList>
                 <TabsContent value="edit">
                   <Textarea
@@ -269,12 +276,12 @@ export default function SubmitIdeaPage() {
                     placeholder="Describe your idea in detail... (Markdown supported)"
                     value={formData.description}
                     onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
-                    className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[120px]"
+                    className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[120px] text-sm md:text-base"
                     rows={6}
                   />
-                  <div className="text-xs text-emerald-600 mt-1">
+                  <div className="text-xs text-emerald-600 mt-2">
                     <span className="font-semibold">Tip:</span> Use Markdown for formatting. For a great description, include:
-                    <ul className="list-disc ml-5">
+                    <ul className="list-disc ml-4 md:ml-5 mt-1">
                       <li>What problem does your idea solve?</li>
                       <li>How does it work? (features, tech, vision)</li>
                       <li>Who is it for? (target users, impact)</li>
@@ -284,7 +291,7 @@ export default function SubmitIdeaPage() {
                   </div>
                 </TabsContent>
                 <TabsContent value="preview">
-                  <div className="prose prose-emerald max-w-none bg-emerald-50/50 p-4 rounded-md border border-emerald-100 min-h-[120px]">
+                  <div className="prose prose-emerald max-w-none bg-emerald-50/50 p-3 md:p-4 rounded-md border border-emerald-100 min-h-[120px] text-sm md:text-base">
                     {formData.description.trim() ? (
                       <ReactMarkdown>{formData.description}</ReactMarkdown>
                     ) : (
@@ -297,22 +304,22 @@ export default function SubmitIdeaPage() {
 
             {/* Categories */}
             <div>
-              <Label className="text-emerald-800 font-medium">Categories *</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+              <Label className="text-emerald-800 font-medium text-sm md:text-base">Categories *</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                 {categories.map((cat) => (
                   <label
                     key={cat.id}
-                    className={`flex items-center space-x-2 p-2 rounded-lg border ${
+                    className={`flex items-center space-x-2 p-2 md:p-3 rounded-lg border ${
                       formData.categoryIds.includes(cat.id)
                         ? "bg-emerald-100 border-emerald-300"
                         : "border-emerald-200"
-                    } cursor-pointer`}
+                    } cursor-pointer hover:bg-emerald-50 transition-colors`}
                   >
                     <Checkbox
                       checked={formData.categoryIds.includes(cat.id)}
                       onCheckedChange={() => toggleCategory(cat.id)}
                     />
-                    <span className="text-emerald-700">{cat.name}</span>
+                    <span className="text-emerald-700 text-sm md:text-base">{cat.name}</span>
                   </label>
                 ))}
               </div>
@@ -320,22 +327,22 @@ export default function SubmitIdeaPage() {
 
             {/* Tech Stack */}
             <div>
-              <Label className="text-emerald-800 font-medium">Tech Stack</Label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+              <Label className="text-emerald-800 font-medium text-sm md:text-base">Tech Stack</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                 {techStacks.map((tech) => (
                   <label
                     key={tech.id}
-                    className={`flex items-center space-x-2 p-2 rounded-lg border ${
+                    className={`flex items-center space-x-2 p-2 md:p-3 rounded-lg border ${
                       formData.techStackIds.includes(tech.id)
                         ? "bg-emerald-100 border-emerald-300"
                         : "border-emerald-200"
-                    } cursor-pointer`}
+                    } cursor-pointer hover:bg-emerald-50 transition-colors`}
                   >
                     <Checkbox
                       checked={formData.techStackIds.includes(tech.id)}
                       onCheckedChange={() => toggleTechStack(tech.id)}
                     />
-                    <span className="text-emerald-700">{tech.name}</span>
+                    <span className="text-emerald-700 text-sm md:text-base">{tech.name}</span>
                   </label>
                 ))}
               </div>
@@ -343,10 +350,10 @@ export default function SubmitIdeaPage() {
 
             {/* Related Links */}
             <div>
-              <Label className="text-emerald-800 font-medium">Related Links</Label>
+              <Label className="text-emerald-800 font-medium text-sm md:text-base">Related Links</Label>
               <div className="space-y-2 mt-2">
                 {formData.links.map((lnk, idx) => (
-                  <div key={idx} className="flex gap-2">
+                  <div key={idx} className="flex flex-col sm:flex-row gap-2">
                     <Input
                       placeholder="URL"
                       value={lnk.url}
@@ -361,25 +368,26 @@ export default function SubmitIdeaPage() {
                     />
                     <Button
                       variant="ghost"
+                      size="sm"
                       onClick={() => removeLink(idx)}
-                      className="text-red-500"
+                      className="text-red-500 self-end"
                     >
                       &times;
                     </Button>
                   </div>
                 ))}
-                <Button variant="outline" onClick={addLink}>
-                  <LinkIcon className="mr-2" /> Add Link
+                <Button variant="outline" size="sm" onClick={addLink} className="text-xs md:text-sm">
+                  <LinkIcon className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Add Link
                 </Button>
               </div>
             </div>
 
             {/* Mockups & Visuals */}
             <div>
-              <Label className="text-emerald-800 font-medium">Mockups & Visuals</Label>
+              <Label className="text-emerald-800 font-medium text-sm md:text-base">Mockups & Visuals</Label>
               <div className="space-y-2 mt-2">
                 {formData.visuals.map((v, idx) => (
-                  <div key={idx} className="flex gap-2">
+                  <div key={idx} className="flex flex-col sm:flex-row gap-2">
                     <Input
                       placeholder="Image URL"
                       value={v.url}
@@ -394,35 +402,36 @@ export default function SubmitIdeaPage() {
                     />
                     <Button
                       variant="ghost"
+                      size="sm"
                       onClick={() => removeVisual(idx)}
-                      className="text-red-500"
+                      className="text-red-500 self-end"
                     >
                       &times;
                     </Button>
                   </div>
                 ))}
-                <Button variant="outline" onClick={addVisual}>
-                  <Upload className="mr-2" /> Add Visual
+                <Button variant="outline" size="sm" onClick={addVisual} className="text-xs md:text-sm">
+                  <Upload className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Add Visual
                 </Button>
               </div>
             </div>
 
             {/* Submit */}
-            <div className="flex flex-col md:flex-row gap-4 pt-6">
+            <div className="flex flex-col gap-3 md:gap-4 pt-4 md:pt-6">
               <Button
                 onClick={handleSubmit}
-                className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm md:text-base py-2 md:py-3"
                 disabled={submitting}
               >
-                <Sparkles className="w-4 h-4 mr-2" />
+                <Sparkles className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
                 {submitting ? "Planting..." : "Plant Idea in Garden"}
               </Button>
-              <Button variant="outline" className="border-emerald-200 text-emerald-700">
+              <Button variant="outline" className="border-emerald-200 text-emerald-700 text-sm md:text-base">
                 Save Draft
               </Button>
             </div>
 
-            <p className="text-sm text-emerald-600/70 text-center mt-4">
+            <p className="text-xs md:text-sm text-emerald-600/70 text-center mt-3 md:mt-4">
               Your idea will be reviewed by our garden keepers before blooming publicly
             </p>
           </CardContent>

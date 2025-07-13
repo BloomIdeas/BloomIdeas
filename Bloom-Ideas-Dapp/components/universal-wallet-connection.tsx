@@ -15,6 +15,7 @@ import { mainnet, sepolia, polygon } from 'viem/chains'
 import MessageSigningModal from './message-signing-modal'
 import { useSignatureVerification } from '@/hooks/use-signature-verification'
 import { supabase } from '@/lib/supabaseClient'  // your initialized client
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface UniversalWalletConnectionProps {
   onConnectionChange?: (isConnected: boolean, address?: string) => void
@@ -33,6 +34,7 @@ export default function UniversalWalletConnection({
   const [showSigningModal, setShowSigningModal] = useState(false)
   const [bloomUsername, setBloomUsername] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const isMobile = useIsMobile()
 
   const {
     hasVerifiedSignature,
@@ -181,13 +183,14 @@ export default function UniversalWalletConnection({
     return (
       <Button
         onClick={openConnectModal}
+        size={isMobile ? "sm" : "default"}
         className="bg-gradient-to-r from-lime-300 via-lime-400 to-green-400 
                    hover:from-lime-400 hover:to-green-500 text-white font-semibold 
-                   shadow-lg px-6 py-2 rounded-lg border-0 focus:ring-2 
-                   focus:ring-lime-300 transition-all duration-200"
+                   shadow-lg px-3 md:px-6 py-2 rounded-lg border-0 focus:ring-2 
+                   focus:ring-lime-300 transition-all duration-200 text-xs md:text-sm"
         style={{ background: 'linear-gradient(90deg, #A3E635 0%, #65C32F 100%)' }}
       >
-        Connect Wallet
+        {isMobile ? "Connect" : "Connect Wallet"}
       </Button>
     )
   }
@@ -230,41 +233,44 @@ export default function UniversalWalletConnection({
     <div className="relative">
       <Button
         variant="outline"
+        size={isMobile ? "sm" : "default"}
         onClick={() => setShowDropdown((v) => !v)}
         className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 
-                   bg-white/80 backdrop-blur-sm"
+                   bg-white/80 backdrop-blur-sm text-xs md:text-sm"
       >
-        <Avatar className="w-5 h-5 mr-2">
+        <Avatar className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2">
           <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">
             {shortAddr.slice(2, 4).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <span className="font-medium">{shortAddr}</span>
-        <Badge className="ml-2 bg-emerald-100 text-emerald-700">
-          {balance} {symbol}
+        <span className="font-medium hidden sm:inline">{shortAddr}</span>
+        <Badge className="ml-1 md:ml-2 bg-emerald-100 text-emerald-700 text-xs">
+          {isMobile ? `${balance} ${symbol}` : `${balance} ${symbol}`}
         </Badge>
       </Button>
 
-            {showDropdown && (
+      {showDropdown && (
         <Card 
           ref={dropdownRef}
-          className="absolute top-full right-0 mt-2 w-80 border-emerald-100 
-                     bg-white/95 backdrop-blur-sm shadow-lg z-50"
+          className={`absolute top-full right-0 mt-2 border-emerald-100 
+                     bg-white/95 backdrop-blur-sm shadow-lg z-50 ${
+                       isMobile ? 'w-72' : 'w-80'
+                     }`}
         >
-          <CardContent className="p-4 space-y-4">
+          <CardContent className="p-3 md:p-4 space-y-3 md:space-y-4">
             {/* Profile Header */}
-            <div className="flex items-center gap-3 border-b border-emerald-100 pb-3">
-              <Avatar className="w-12 h-12">
-                <AvatarFallback className="bg-emerald-100 text-emerald-700">
+            <div className="flex items-center gap-2 md:gap-3 border-b border-emerald-100 pb-2 md:pb-3">
+              <Avatar className="w-10 h-10 md:w-12 md:h-12">
+                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs md:text-sm">
                   {shortAddr.slice(2, 4).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
-                <p className="font-semibold text-emerald-900">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-emerald-900 text-sm md:text-base">
                   {bloomUsername || "Anonymous Gardener"}
                 </p>
-                <p className="text-sm text-emerald-600/70">{shortAddr}</p>
-                <Badge className="bg-teal-400 text-white border-0 mt-1">
+                <p className="text-xs md:text-sm text-emerald-600/70">{shortAddr}</p>
+                <Badge className="bg-teal-400 text-white border-0 mt-1 text-xs">
                   Grove-Keeper
                 </Badge>
               </div>
@@ -272,26 +278,26 @@ export default function UniversalWalletConnection({
 
             {/* Wallet & Access Info */}
             <div className="space-y-2">
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-700 text-xs md:text-sm">
                 <span>Balance</span>
                 <span className="font-medium text-emerald-900">
                   {balance} {symbol}
                 </span>
               </div>
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-700 text-xs md:text-sm">
                 <span>Garden Sprouts</span>
                 <span className="font-medium text-emerald-900">342 🌱</span>
               </div>
-              <div className="flex justify-between text-emerald-700">
+              <div className="flex justify-between text-emerald-700 text-xs md:text-sm">
                 <span>Network</span>
-                <Badge className="border-emerald-200 text-emerald-700">
+                <Badge className="border-emerald-200 text-emerald-700 text-xs">
                   {chain.name}
                 </Badge>
               </div>
               {hasVerifiedSignature && (
-                <div className="flex justify-between text-emerald-700">
+                <div className="flex justify-between text-emerald-700 text-xs md:text-sm">
                   <span>Garden Access</span>
-                  <Badge className="bg-green-100 text-green-700 border-green-200">
+                  <Badge className="bg-green-100 text-green-700 border-green-200 text-xs">
                     Verified ✅
                   </Badge>
                 </div>
@@ -299,39 +305,42 @@ export default function UniversalWalletConnection({
             </div>
 
             {/* Actions */}
-            <div className="space-y-2 border-t border-emerald-100 pt-2">
+            <div className="space-y-1 md:space-y-2 border-t border-emerald-100 pt-2">
               <Link href="/profile/me">
                 <Button
                   variant="ghost"
-                  className="w-full justify-start text-emerald-700 hover:bg-emerald-50"
+                  size="sm"
+                  className="w-full justify-start text-emerald-700 hover:bg-emerald-50 text-xs md:text-sm"
                   onClick={() => setShowDropdown(false)}
                 >
-                  <User className="w-4 h-4 mr-2" />
+                  <User className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                   View Profile
                 </Button>
               </Link>
 
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={copyAddress}
-                className="w-full justify-start text-emerald-700 hover:bg-emerald-50"
+                className="w-full justify-start text-emerald-700 hover:bg-emerald-50 text-xs md:text-sm"
               >
-                <Copy className="w-4 h-4 mr-2" />
+                <Copy className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                 Copy Address
               </Button>
 
               {explorerUrl && (
                 <Button
                   variant="ghost"
+                  size="sm"
                   asChild
-                  className="w-full justify-start text-emerald-700 hover:bg-emerald-50"
+                  className="w-full justify-start text-emerald-700 hover:bg-emerald-50 text-xs md:text-sm"
                 >
                   <a
                     href={explorerUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
+                    <ExternalLink className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                     View on Explorer
                   </a>
                 </Button>
@@ -339,10 +348,11 @@ export default function UniversalWalletConnection({
 
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={handleDisconnect}
-                className="w-full justify-start text-red-600 hover:bg-red-50"
+                className="w-full justify-start text-red-600 hover:bg-red-50 text-xs md:text-sm"
               >
-                <LogOut className="w-4 h-4 mr-2" />
+                <LogOut className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                 Disconnect
               </Button>
             </div>
