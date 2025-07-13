@@ -13,6 +13,7 @@ import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { formatUnits } from 'viem'
 import { mainnet, sepolia, polygon } from 'viem/chains'
 import MessageSigningModal from './message-signing-modal'
+import { useSignatureVerification } from '@/hooks/use-signature-verification'
 
 interface UniversalWalletConnectionProps {
   onConnectionChange?: (isConnected: boolean, address?: string) => void
@@ -31,7 +32,14 @@ export default function UniversalWalletConnection({
   const { data: balanceData } = useBalance({ address, chainId })
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSigningModal, setShowSigningModal] = useState(false)
-  const [hasVerifiedSignature, setHasVerifiedSignature] = useState(false)
+  
+  const {
+    hasVerifiedSignature,
+    signature,
+    isLoading: signatureLoading,
+    verifySignature,
+    clearSignature,
+  } = useSignatureVerification()
 
   // Get chain info from chainId
   const getChainInfo = (id: number) => {
@@ -53,12 +61,12 @@ export default function UniversalWalletConnection({
     setIsMounted(true)
   }, [])
 
+  // Show signing modal if connected but no verified signature
   useEffect(() => {
-    if (isMounted && isConnected && address && !hasVerifiedSignature) {
-      // Show signing modal when wallet connects
+    if (isMounted && isConnected && address && !signatureLoading && !hasVerifiedSignature) {
       setShowSigningModal(true)
     }
-  }, [isMounted, isConnected, address, hasVerifiedSignature])
+  }, [isMounted, isConnected, address, signatureLoading, hasVerifiedSignature])
 
   useEffect(() => {
     if (isMounted) {
@@ -67,9 +75,11 @@ export default function UniversalWalletConnection({
   }, [isMounted, isConnected, hasVerifiedSignature, address, onConnectionChange])
 
   const handleSignSuccess = (signature: string) => {
-    setHasVerifiedSignature(true)
-    setShowSigningModal(false)
-    onSignatureVerified?.(address!, signature)
+    if (address) {
+      verifySignature(signature)
+      setShowSigningModal(false)
+      onSignatureVerified?.(address, signature)
+    }
   }
 
   const handleSignReject = () => {
@@ -77,6 +87,12 @@ export default function UniversalWalletConnection({
     // Disconnect wallet if user rejects signing
     disconnect()
     toast.error("Wallet disconnected - signature required to access the garden")
+  }
+
+  const handleDisconnect = () => {
+    clearSignature()
+    setShowDropdown(false)
+    disconnect()
   }
 
   if (!isMounted) return null
@@ -172,6 +188,14 @@ export default function UniversalWalletConnection({
                   {netName}
                 </Badge>
               </div>
+              {hasVerifiedSignature && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Garden Access</span>
+                  <Badge className="bg-green-100 text-green-700 border-green-200">
+                    Verified ✅
+                  </Badge>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2 border-t border-emerald-100 pt-2">
@@ -207,7 +231,7 @@ export default function UniversalWalletConnection({
               )}
               <Button
                 variant="ghost"
-                onClick={() => { disconnect(); setShowDropdown(false); setHasVerifiedSignature(false); }}
+                onClick={handleDisconnect}
                 className="w-full justify-start text-red-600 hover:bg-red-50"
               >
                 <LogOut className="w-4 h-4 mr-2" />
