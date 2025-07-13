@@ -270,25 +270,82 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
           {/* Tab Content */}
           {activeTab === "overview" && (
             <div className="space-y-6">
-              {/* Garden Theater */}
+              {/* Enhanced Garden Theater */}
               <div>
-                <h3 className="text-lg font-semibold text-emerald-900 mb-3">🌸 Garden Theater</h3>
-                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg p-6 text-center">
-                  <div className="grid grid-cols-8 gap-2 max-w-sm mx-auto mb-4">
-                    {Array.from({ length: 24 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`w-4 h-4 rounded-full ${
-                          i < Math.floor(mockProfile.stats.sprouts / 15)
-                            ? "bg-gradient-to-br from-pink-400 to-rose-500 animate-pulse"
-                            : "bg-emerald-100"
-                        }`}
-                      />
-                    ))}
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
+                    <Flower2 className="w-5 h-5 text-white animate-pulse" />
                   </div>
-                  <p className="text-emerald-700 font-medium text-sm">
-                    {Math.floor(mockProfile.stats.sprouts / 15)} petals bloomed from garden activities
-                  </p>
+                  <div>
+                    <h3 className="text-lg font-semibold text-emerald-900">🌸 Your Personal Garden</h3>
+                    <p className="text-sm text-emerald-700/70">A beautiful visualization of your garden activities</p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 rounded-xl p-6 border border-emerald-200/50 relative overflow-hidden">
+                  {/* Background Elements */}
+                  <div className="absolute inset-0 opacity-10">
+                    <div className="absolute top-2 left-2 text-2xl animate-bounce">🌿</div>
+                    <div className="absolute top-2 right-2 text-xl animate-bounce" style={{ animationDelay: "1s" }}>
+                      🦋
+                    </div>
+                    <div className="absolute bottom-2 left-2 text-lg animate-bounce" style={{ animationDelay: "2s" }}>
+                      🌱
+                    </div>
+                    <div
+                      className="absolute bottom-2 right-2 text-2xl animate-bounce"
+                      style={{ animationDelay: "0.5s" }}
+                    >
+                      🌻
+                    </div>
+                  </div>
+
+                  {/* Compact Petals Grid */}
+                  <div className="relative z-10">
+                    <div className="grid grid-cols-8 gap-2 max-w-sm mx-auto mb-4">
+                      {Array.from({ length: 32 }).map((_, i) => {
+                        const isBloomedPetal = i < Math.floor(mockProfile.stats.sprouts / 11)
+                        const animationDelay = `${(i * 0.1) % 2}s`
+
+                        return (
+                          <div
+                            key={i}
+                            className={`w-4 h-4 rounded-full transition-all duration-300 ${
+                              isBloomedPetal
+                                ? "bg-gradient-to-br from-pink-400 to-rose-500 shadow-md animate-pulse"
+                                : "bg-emerald-100 border border-emerald-200"
+                            }`}
+                            style={{
+                              animationDelay: isBloomedPetal ? animationDelay : "0s",
+                              boxShadow: isBloomedPetal ? "0 0 10px rgba(244, 114, 182, 0.3)" : "none",
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+
+                    {/* Compact Stats */}
+                    <div className="text-center">
+                      <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full px-4 py-2 border border-emerald-200 mb-3">
+                        <div className="w-6 h-6 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center animate-pulse">
+                          <Sparkles className="w-3 h-3 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-lg font-bold text-emerald-900">
+                            {Math.floor(mockProfile.stats.sprouts / 11)} Petals Bloomed
+                          </p>
+                        </div>
+                      </div>
+
+                      <p className="text-sm text-emerald-700 font-medium flex items-center justify-center gap-1">
+                        <span className="animate-bounce">🌺</span>
+                        Your garden is flourishing beautifully!
+                        <span className="animate-bounce" style={{ animationDelay: "0.5s" }}>
+                          🌺
+                        </span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 

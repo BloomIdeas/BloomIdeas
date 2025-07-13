@@ -23,7 +23,6 @@ import {
   Heart,
   Code,
   Star,
-  Bell,
   Edit,
   Save,
 } from "lucide-react"
@@ -136,15 +135,8 @@ export default function MyProfilePage() {
                 <span className="font-semibold text-emerald-800">My Garden Profile</span>
               </div>
             </div>
+            {/* Header buttons */}
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
-              >
-                <Bell className="w-4 h-4 mr-2" />
-                Notifications
-              </Button>
               <Button
                 variant="outline"
                 size="sm"

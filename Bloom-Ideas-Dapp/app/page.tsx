@@ -8,7 +8,9 @@ import Link from "next/link"
 import ProfilePopup from "@/components/profile-popup"
 import EnhancedIdeaModal from "@/components/enhanced-idea-modal"
 import SimplifiedIdeaCard from "@/components/simplified-idea-card"
-import SmartWalletConnection from "@/components/smart-wallet-connection"
+import UniversalWalletConnection from "@/components/universal-wallet-connection"
+import GardenExplorer from "@/components/garden-explorer"
+import { FloatingGardenElements, SeasonalBackground, GardenWeather } from "@/components/garden-elements"
 
 const mockIdeas = [
   {
@@ -109,6 +111,13 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null)
   const [selectedIdea, setSelectedIdea] = useState<any>(null)
+  const [isWalletConnected, setIsWalletConnected] = useState(false)
+  const [walletAddress, setWalletAddress] = useState("")
+
+  const handleWalletConnectionChange = (connected: boolean, address?: string) => {
+    setIsWalletConnected(connected)
+    setWalletAddress(address || "")
+  }
 
   const filteredIdeas = mockIdeas.filter((idea) => {
     const matchesFilter = selectedFilter === "all" || idea.status === selectedFilter
@@ -120,24 +129,34 @@ export default function HomePage() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
+    <div className="min-h-screen relative">
+      {/* Seasonal Background */}
+      <SeasonalBackground season="spring" />
+
+      {/* Floating Garden Elements */}
+      <FloatingGardenElements />
+
       {/* Header */}
-      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50 relative">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center animate-pulse">
                 <Flower2 className="w-6 h-6 text-white" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
                   Bloom Ideas
                 </h1>
-                <p className="text-sm text-emerald-600/70">Where hackathon ideas flourish</p>
+                <p className="text-sm text-emerald-600/70">Where hackathon ideas flourish 🌸</p>
               </div>
             </div>
+
             <div className="flex items-center gap-4">
-              <SmartWalletConnection />
+              <UniversalWalletConnection onConnectionChange={handleWalletConnectionChange} />
+
+              {isWalletConnected && <GardenExplorer walletAddress={walletAddress} />}
+
               <Link href="/submit">
                 <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white">
                   <Leaf className="w-4 h-4 mr-2" />
@@ -149,29 +168,34 @@ export default function HomePage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 relative z-10">
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-4 py-2 rounded-full mb-6">
-            <Sparkles className="w-4 h-4 text-emerald-600" />
-            <span className="text-emerald-700 font-medium">Cultivating Innovation</span>
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-4 py-2 rounded-full mb-6 backdrop-blur-sm">
+            <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
+            <span className="text-emerald-700 font-medium">Cultivating Innovation 🌱</span>
           </div>
           <h2 className="text-4xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">
             Digital Garden of Ideas
           </h2>
-          <p className="text-xl text-emerald-700/80 max-w-2xl mx-auto">
-            Plant your ideas, watch them grow, and harvest the future of Web3 innovation together.
+          <p className="text-xl text-emerald-700/80 max-w-2xl mx-auto mb-6">
+            Plant your ideas, watch them grow, and harvest the future of Web3 innovation together. 🌻
           </p>
+
+          {/* Garden Weather Widget */}
+          <div className="max-w-md mx-auto mb-8">
+            <GardenWeather />
+          </div>
         </div>
 
         {/* Search */}
         <div className="relative max-w-md mx-auto mb-8">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-emerald-500 w-5 h-5" />
           <Input
-            placeholder="Search gardens..."
+            placeholder="Search gardens... 🔍"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400/20"
+            className="pl-10 border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400/20 bg-white/80 backdrop-blur-sm"
           />
         </div>
 
@@ -184,8 +208,8 @@ export default function HomePage() {
               onClick={() => setSelectedFilter(filter.id)}
               className={
                 selectedFilter === filter.id
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white"
-                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg"
+                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm"
               }
             >
               {filter.label}
@@ -203,8 +227,8 @@ export default function HomePage() {
               onClick={() => setSelectedTag(tag)}
               className={
                 selectedTag === tag
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm"
               }
             >
               {tag}
@@ -212,12 +236,13 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* Results Count */}
+        {/* Results Count with Garden Emoji */}
         <div className="text-center mb-6">
           <p className="text-emerald-600/70">
-            Found {filteredIdeas.length} beautiful garden{filteredIdeas.length !== 1 ? "s" : ""}
+            🌺 Found {filteredIdeas.length} beautiful garden{filteredIdeas.length !== 1 ? "s" : ""}
             {selectedFilter !== "all" &&
-              ` in ${filterOptions.find((f) => f.id === selectedFilter)?.label.toLowerCase()}`}
+              ` in ${filterOptions.find((f) => f.id === selectedFilter)?.label.toLowerCase()}`}{" "}
+            🌺
           </p>
         </div>
 
@@ -239,10 +264,10 @@ export default function HomePage() {
             <Button
               variant="outline"
               size="lg"
-              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm shadow-lg"
             >
               <Sparkles className="w-4 h-4 mr-2" />
-              Discover More Gardens
+              Discover More Gardens 🌻
             </Button>
           </div>
         )}
@@ -250,39 +275,48 @@ export default function HomePage() {
         {/* Empty State */}
         {filteredIdeas.length === 0 && (
           <div className="text-center py-12">
-            <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
               <Flower2 className="w-12 h-12 text-emerald-400" />
             </div>
-            <h3 className="text-xl font-semibold text-emerald-900 mb-2">No Gardens Found</h3>
+            <h3 className="text-xl font-semibold text-emerald-900 mb-2">No Gardens Found 🌱</h3>
             <p className="text-emerald-600/70 mb-6">
-              Try adjusting your filters or plant the first idea in this category!
+              The garden is waiting for your seeds! Plant the first idea in this category! 🌸
             </p>
             <Link href="/submit">
               <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white">
                 <Leaf className="w-4 h-4 mr-2" />
-                Plant First Idea
+                Plant First Seed 🌱
               </Button>
             </Link>
           </div>
         )}
 
-        {/* Simplified Footer */}
-        <footer className="mt-20 border-t border-emerald-200/50 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 backdrop-blur-sm">
+        {/* Enhanced Footer */}
+        <footer className="mt-20 border-t border-emerald-200/50 bg-gradient-to-r from-emerald-50/80 to-teal-50/80 backdrop-blur-sm rounded-t-2xl">
           <div className="container mx-auto px-4 py-8">
             <div className="flex flex-col md:flex-row items-center justify-between">
               <div className="flex items-center gap-3 mb-4 md:mb-0">
-                <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center animate-pulse">
                   <Flower2 className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                    Bloom Ideas
+                    Bloom Ideas 🌸
                   </h3>
-                  <p className="text-xs text-emerald-600/70">Where ideas flourish</p>
+                  <p className="text-xs text-emerald-600/70">Where ideas flourish and dreams bloom</p>
                 </div>
               </div>
 
-              <p className="text-emerald-600/70 text-sm flex items-center gap-1">Made with 💚 for the Web3 community</p>
+              <div className="flex items-center gap-4 text-emerald-600/70 text-sm">
+                <span>🌱 Plant</span>
+                <span>🌿 Grow</span>
+                <span>🌸 Bloom</span>
+                <span>🌻 Harvest</span>
+              </div>
+
+              <p className="text-emerald-600/70 text-sm flex items-center gap-1">
+                Made with 💚 for the Web3 garden community 🌺
+              </p>
             </div>
           </div>
         </footer>

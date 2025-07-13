@@ -20,8 +20,8 @@ import {
   Heart,
   Code,
   Star,
-  Settings,
   Bell,
+  Sparkles,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -96,13 +96,6 @@ export default function ProfilePage() {
                 <span className="font-semibold text-emerald-800">Profile Garden</span>
               </div>
             </div>
-            <Button
-              variant="outline"
-              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent"
-            >
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </Button>
           </div>
         </div>
       </header>
@@ -264,29 +257,111 @@ export default function ProfilePage() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            {/* Garden Theater */}
-            <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader>
-                <h3 className="text-xl font-semibold text-emerald-900">🌸 Garden Theater</h3>
-                <p className="text-emerald-700/70">Your personal garden visualization</p>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg p-8 text-center">
-                  <div className="grid grid-cols-8 gap-2 max-w-md mx-auto mb-4">
-                    {Array.from({ length: 32 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`w-6 h-6 rounded-full ${
-                          i < Math.floor(mockProfile.stats.sprouts / 10)
-                            ? "bg-gradient-to-br from-pink-400 to-rose-500 animate-pulse"
-                            : "bg-emerald-100"
-                        }`}
-                      />
-                    ))}
+            {/* Enhanced Garden Theater */}
+            <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
+                    <Flower2 className="w-6 h-6 text-white animate-pulse" />
                   </div>
-                  <p className="text-emerald-700 font-medium">
-                    {Math.floor(mockProfile.stats.sprouts / 10)} petals bloomed from your garden activities
-                  </p>
+                  <div>
+                    <h3 className="text-xl font-semibold text-emerald-900">🌸 Your Personal Garden</h3>
+                    <p className="text-emerald-700/70">A beautiful visualization of your garden activities</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8">
+                <div className="text-center mb-6">
+                  <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-100 to-teal-100 px-4 py-2 rounded-full mb-4">
+                    <Sparkles className="w-4 h-4 text-emerald-600 animate-pulse" />
+                    <span className="text-emerald-700 font-medium">Garden in Full Bloom</span>
+                  </div>
+                </div>
+
+                {/* Enhanced Garden Visualization */}
+                <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 rounded-2xl p-8 border-2 border-emerald-200/50 relative overflow-hidden">
+                  {/* Background Garden Elements */}
+                  <div className="absolute inset-0 opacity-10">
+                    <div className="absolute top-4 left-4 text-4xl animate-bounce" style={{ animationDelay: "0s" }}>
+                      🌿
+                    </div>
+                    <div className="absolute top-8 right-8 text-3xl animate-bounce" style={{ animationDelay: "1s" }}>
+                      🦋
+                    </div>
+                    <div className="absolute bottom-6 left-8 text-2xl animate-bounce" style={{ animationDelay: "2s" }}>
+                      🌱
+                    </div>
+                    <div
+                      className="absolute bottom-4 right-4 text-3xl animate-bounce"
+                      style={{ animationDelay: "0.5s" }}
+                    >
+                      🌻
+                    </div>
+                  </div>
+
+                  {/* Petals Grid */}
+                  <div className="relative z-10">
+                    <div className="grid grid-cols-10 gap-3 max-w-2xl mx-auto mb-6">
+                      {Array.from({ length: 50 }).map((_, i) => {
+                        const isBloomedPetal = i < Math.floor(mockProfile.stats.sprouts / 7)
+                        const animationDelay = `${(i * 0.1) % 3}s`
+
+                        return (
+                          <div
+                            key={i}
+                            className={`w-6 h-6 rounded-full transition-all duration-500 ${
+                              isBloomedPetal
+                                ? "bg-gradient-to-br from-pink-400 via-rose-400 to-pink-500 shadow-lg animate-pulse transform hover:scale-125"
+                                : "bg-emerald-100 border-2 border-emerald-200 hover:bg-emerald-200"
+                            }`}
+                            style={{
+                              animationDelay: isBloomedPetal ? animationDelay : "0s",
+                              boxShadow: isBloomedPetal ? "0 0 15px rgba(244, 114, 182, 0.4)" : "none",
+                            }}
+                            title={isBloomedPetal ? "Bloomed Petal" : "Waiting to Bloom"}
+                          />
+                        )
+                      })}
+                    </div>
+
+                    {/* Garden Stats */}
+                    <div className="text-center space-y-4">
+                      <div className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm rounded-full px-6 py-3 border border-emerald-200">
+                        <div className="w-8 h-8 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center animate-pulse">
+                          <Sparkles className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-2xl font-bold text-emerald-900">
+                            {Math.floor(mockProfile.stats.sprouts / 7)} Petals Bloomed
+                          </p>
+                          <p className="text-sm text-emerald-600/70">From your garden activities</p>
+                        </div>
+                      </div>
+
+                      {/* Progress to Next Bloom */}
+                      <div className="max-w-md mx-auto">
+                        <div className="flex justify-between text-sm text-emerald-600/70 mb-2">
+                          <span>Next Petal Bloom</span>
+                          <span>{7 - (mockProfile.stats.sprouts % 7)} sprouts needed</span>
+                        </div>
+                        <div className="w-full bg-emerald-100 rounded-full h-2">
+                          <div
+                            className="bg-gradient-to-r from-pink-400 to-rose-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${((mockProfile.stats.sprouts % 7) / 7) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Garden Mood */}
+                      <div className="inline-flex items-center gap-2 text-emerald-700">
+                        <span className="text-2xl animate-bounce">🌺</span>
+                        <span className="font-medium">Your garden is thriving!</span>
+                        <span className="text-2xl animate-bounce" style={{ animationDelay: "0.5s" }}>
+                          🌺
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
