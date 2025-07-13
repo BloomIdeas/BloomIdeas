@@ -14,15 +14,14 @@ import { formatUnits } from 'viem'
 import { mainnet, sepolia, polygon } from 'viem/chains'
 import MessageSigningModal from './message-signing-modal'
 import { useSignatureVerification } from '@/hooks/use-signature-verification'
+import { supabase } from '@/lib/supabaseClient'  // your initialized client
 
 interface UniversalWalletConnectionProps {
   onConnectionChange?: (isConnected: boolean, address?: string) => void
-  onSignatureVerified?: (address: string, signature: string) => void
 }
 
 export default function UniversalWalletConnection({
   onConnectionChange,
-  onSignatureVerified,
 }: UniversalWalletConnectionProps) {
   const [isMounted, setIsMounted] = useState(false)
   const { address, isConnected } = useAccount()
@@ -32,7 +31,7 @@ export default function UniversalWalletConnection({
   const { data: balanceData } = useBalance({ address, chainId })
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSigningModal, setShowSigningModal] = useState(false)
-  
+
   const {
     hasVerifiedSignature,
     signature,
@@ -41,58 +40,95 @@ export default function UniversalWalletConnection({
     clearSignature,
   } = useSignatureVerification()
 
-  // Get chain info from chainId
-  const getChainInfo = (id: number) => {
-    switch (id) {
-      case mainnet.id:
-        return mainnet
-      case sepolia.id:
-        return sepolia
-      case polygon.id:
-        return polygon
-      default:
-        return mainnet
-    }
-  }
-
-  const chain = chainId ? getChainInfo(chainId) : null
-
+  // ensure we only run in browser
   useEffect(() => {
     setIsMounted(true)
   }, [])
 
-  // Show signing modal if connected but no verified signature
+  // if connected but no valid signature, prompt sign
   useEffect(() => {
-    if (isMounted && isConnected && address && !signatureLoading && !hasVerifiedSignature) {
+    if (
+      isMounted &&
+      isConnected &&
+      address &&
+      !signatureLoading &&
+      !hasVerifiedSignature
+    ) {
       setShowSigningModal(true)
     }
   }, [isMounted, isConnected, address, signatureLoading, hasVerifiedSignature])
 
+  // propagate connection+auth upward
   useEffect(() => {
-    if (isMounted) {
-      onConnectionChange?.(isConnected && hasVerifiedSignature, address)
-    }
-  }, [isMounted, isConnected, hasVerifiedSignature, address, onConnectionChange])
+    onConnectionChange?.(isConnected && hasVerifiedSignature, address)
+  }, [isConnected, hasVerifiedSignature, address, onConnectionChange])
 
-  const handleSignSuccess = (signature: string) => {
-    if (address) {
-      verifySignature(signature)
-      setShowSigningModal(false)
-      onSignatureVerified?.(address, signature)
+  // upsert user record in Supabase
+  const upsertUserSignature = async (
+    wallet: string,
+    sig: string
+  ): Promise<void> => {
+    try {
+      // 1. Check existing
+      const { data: existing, error: selErr } = await supabase
+        .from('users')
+        .select('signature_count')
+        .eq('wallet_address', wallet)
+        .single()
+      if (selErr && selErr.code !== 'PGRST116') throw selErr
+
+      if (existing) {
+        // 2a. Update signature & increment count
+        const { error: updErr } = await supabase
+          .from('users')
+          .update({
+            signature: sig,
+            signature_count: existing.signature_count + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('wallet_address', wallet)
+        if (updErr) throw updErr
+      } else {
+        // 2b. Insert new user with initial count=1
+        const { error: insErr } = await supabase
+          .from('users')
+          .insert({
+            wallet_address: wallet,
+            signature: sig,
+            signature_count: 1,
+          })
+        if (insErr) throw insErr
+      }
+
+      toast.success('Wallet authenticated')
+    } catch (err) {
+      console.error('Upsert user error:', err)
+      toast.error('Failed to record login')
     }
+  }
+
+  const handleSignSuccess = (sig: string) => {
+    if (!address) return
+    // 1. Verify on-chain signature
+    verifySignature(sig)
+    // 2. Persist into Supabase
+    upsertUserSignature(address, sig)
+    // 3. Close modal
+    setShowSigningModal(false)
   }
 
   const handleSignReject = () => {
     setShowSigningModal(false)
-    // Disconnect wallet if user rejects signing
+    clearSignature()
     disconnect()
-    toast.error("Wallet disconnected - signature required to access the garden")
+    toast.error('Signature required to continue')
   }
 
   const handleDisconnect = () => {
     clearSignature()
     setShowDropdown(false)
     disconnect()
+    toast('Disconnected')
   }
 
   if (!isMounted) return null
@@ -101,7 +137,10 @@ export default function UniversalWalletConnection({
     return (
       <Button
         onClick={openConnectModal}
-        className="bg-gradient-to-r from-lime-300 via-lime-400 to-green-400 hover:from-lime-400 hover:to-green-500 text-white font-semibold shadow-lg px-6 py-2 rounded-lg border-0 focus:ring-2 focus:ring-lime-300 transition-all duration-200"
+        className="bg-gradient-to-r from-lime-300 via-lime-400 to-green-400 
+                   hover:from-lime-400 hover:to-green-500 text-white font-semibold 
+                   shadow-lg px-6 py-2 rounded-lg border-0 focus:ring-2 
+                   focus:ring-lime-300 transition-all duration-200"
         style={{ background: 'linear-gradient(90deg, #A3E635 0%, #65C32F 100%)' }}
       >
         Connect Wallet
@@ -109,7 +148,6 @@ export default function UniversalWalletConnection({
     )
   }
 
-  // Show signing modal if connected but not verified
   if (showSigningModal && address) {
     return (
       <MessageSigningModal
@@ -120,20 +158,27 @@ export default function UniversalWalletConnection({
     )
   }
 
-  const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : ""
-  const balance = balanceData ? parseFloat(formatUnits(balanceData.value, balanceData.decimals)).toFixed(4) : "0.0000"
-  const symbol = balanceData?.symbol ?? "ETH"
-  const netName = chain?.name ?? "Unknown"
-
-  const explorerUrl = chain?.blockExplorers?.default
+  const shortAddr = address
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : ''
+  const balance = balanceData
+    ? parseFloat(formatUnits(balanceData.value, balanceData.decimals)).toFixed(4)
+    : '0.0000'
+  const symbol = balanceData?.symbol ?? 'ETH'
+  const chain = chainId
+    ? [mainnet, sepolia, polygon].find((c) => c.id === chainId) ??
+      mainnet
+    : mainnet
+  const explorerUrl = chain.blockExplorers?.default
     ? `${chain.blockExplorers.default.url}/address/${address}`
     : null
 
-  const copyAddress = () => {
-    if (address) {
-      navigator.clipboard.writeText(address)
-        .then(() => toast.success("Address copied"))
-        .catch(() => toast.error("Copy failed"))
+  const copyAddress = async () => {
+    try {
+      if (address) await navigator.clipboard.writeText(address)
+      toast.success('Address copied')
+    } catch {
+      toast.error('Copy failed')
     }
   }
 
@@ -141,8 +186,9 @@ export default function UniversalWalletConnection({
     <div className="relative">
       <Button
         variant="outline"
-        onClick={() => setShowDropdown(v => !v)}
-        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm"
+        onClick={() => setShowDropdown((v) => !v)}
+        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 
+                   bg-white/80 backdrop-blur-sm"
       >
         <Avatar className="w-5 h-5 mr-2">
           <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">
@@ -156,8 +202,10 @@ export default function UniversalWalletConnection({
       </Button>
 
       {showDropdown && (
-        <Card className="absolute top-full right-0 mt-2 w-80 border-emerald-100 bg-white/95 backdrop-blur-sm shadow-lg z-50">
+        <Card className="absolute top-full right-0 mt-2 w-80 border-emerald-100 
+                         bg-white/95 backdrop-blur-sm shadow-lg z-50">
           <CardContent className="p-4 space-y-4">
+            {/* Profile Header */}
             <div className="flex items-center gap-3 border-b border-emerald-100 pb-3">
               <Avatar className="w-12 h-12">
                 <AvatarFallback className="bg-emerald-100 text-emerald-700">
@@ -173,10 +221,13 @@ export default function UniversalWalletConnection({
               </div>
             </div>
 
+            {/* Wallet & Access Info */}
             <div className="space-y-2">
               <div className="flex justify-between text-emerald-700">
                 <span>Balance</span>
-                <span className="font-medium text-emerald-900">{balance} {symbol}</span>
+                <span className="font-medium text-emerald-900">
+                  {balance} {symbol}
+                </span>
               </div>
               <div className="flex justify-between text-emerald-700">
                 <span>Garden Sprouts</span>
@@ -185,7 +236,7 @@ export default function UniversalWalletConnection({
               <div className="flex justify-between text-emerald-700">
                 <span>Network</span>
                 <Badge className="border-emerald-200 text-emerald-700">
-                  {netName}
+                  {chain.name}
                 </Badge>
               </div>
               {hasVerifiedSignature && (
@@ -198,6 +249,7 @@ export default function UniversalWalletConnection({
               )}
             </div>
 
+            {/* Actions */}
             <div className="space-y-2 border-t border-emerald-100 pt-2">
               <Link href="/profile/me">
                 <Button
@@ -209,6 +261,7 @@ export default function UniversalWalletConnection({
                   View Profile
                 </Button>
               </Link>
+
               <Button
                 variant="ghost"
                 onClick={copyAddress}
@@ -217,18 +270,24 @@ export default function UniversalWalletConnection({
                 <Copy className="w-4 h-4 mr-2" />
                 Copy Address
               </Button>
+
               {explorerUrl && (
                 <Button
                   variant="ghost"
                   asChild
                   className="w-full justify-start text-emerald-700 hover:bg-emerald-50"
                 >
-                  <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={explorerUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <ExternalLink className="w-4 h-4 mr-2" />
                     View on Explorer
                   </a>
                 </Button>
               )}
+
               <Button
                 variant="ghost"
                 onClick={handleDisconnect}
