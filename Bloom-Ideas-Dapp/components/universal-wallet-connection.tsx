@@ -60,7 +60,8 @@ export default function UniversalWalletConnection({
     return (
       <Button
         onClick={openConnectModal}
-        className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
+        className="bg-gradient-to-r from-lime-300 via-lime-400 to-green-400 hover:from-lime-400 hover:to-green-500 text-white font-semibold shadow-lg px-6 py-2 rounded-lg border-0 focus:ring-2 focus:ring-lime-300 transition-all duration-200"
+        style={{ background: 'linear-gradient(90deg, #A3E635 0%, #65C32F 100%)' }}
       >
         Connect Wallet
       </Button>
