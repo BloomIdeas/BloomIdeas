@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { getReputationLevel, getSproutTypeId } from "@/lib/sprouts"
 
 import {
   Search,
@@ -72,19 +73,7 @@ export default function HomePage() {
   const isMobile = useIsMobile()
 
   // --- Load everything from Supabase ---
-  async function fetchData() {
-    // 1) categories
-    const { data: cats, error: catsErr } = await supabase
-      .from('categories')
-      .select('id,name')
-      .order('name', { ascending: true })
-    if (catsErr) {
-      console.error(catsErr)
-      return toast.error("Failed to load categories")
-    }
-    setCategories(cats)
-
-    // 2) all the rows we'll need
+  async function fetchAllData(latestCategories: Category[]) {
     const [
       { data: prjs, error: prjErr },
       { data: pcats, error: pcErr },
@@ -119,7 +108,7 @@ export default function HomePage() {
     }
 
     // map categoryId -> name
-    const catMap = new Map(categories.map((c) => [c.id, c.name]))
+    const catMap = new Map(latestCategories.map((c) => [c.id, c.name]))
     // map wallet_address -> bloom_username
     const userMap = new Map((users ?? []).map((u) => [u.wallet_address, u.bloom_username]))
 
@@ -154,9 +143,23 @@ export default function HomePage() {
     setProjects(enriched)
   }
 
-  // initial load & reload whenever wallet changes
+  // Fetch categories first, then fetch the rest
   useEffect(() => {
-    fetchData()
+    async function fetchCategoriesAndProjects() {
+      const { data: cats, error: catsErr } = await supabase
+        .from('categories')
+        .select('id,name')
+        .order('name', { ascending: true })
+      if (catsErr) {
+        console.error(catsErr)
+        toast.error("Failed to load categories")
+        return
+      }
+      setCategories(cats)
+      await fetchAllData(cats)
+    }
+    fetchCategoriesAndProjects()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress])
 
   // --- care toggle ---
@@ -164,24 +167,90 @@ export default function HomePage() {
     if (!walletAddress) {
       return toast.error("Connect your wallet first")
     }
+    
     // check existing row
     const existing = projects.find((p) => p.id === projId)?.userCareAction
+    
     if (existing === action) {
-      // delete
-      await supabase
-        .from("project_care_actions")
-        .delete()
-        .match({ project_id: projId, user_address: walletAddress })
+      // User is removing their care action
+      if (action === "nurture") {
+        // Show confirmation toast
+        toast(
+          "Removing your nurture will reduce your sprouts!",
+          {
+            description: "Are you sure you want to remove your nurture? This will delete the sprout you earned for nurturing this garden.",
+            action: {
+              label: "Remove Nurture",
+              onClick: async () => {
+                // Delete care action
+                await supabase
+                  .from("project_care_actions")
+                  .delete()
+                  .match({ project_id: projId, user_address: walletAddress })
+                // Delete the sprout(s) earned for this project by this user
+                const nurtureTypeId = await getSproutTypeId('nurture')
+                await supabase
+                  .from("sprouts")
+                  .delete()
+                  .match({
+                    user_address: walletAddress,
+                    sprout_type_id: nurtureTypeId,
+                    related_id: projId,
+                  })
+                toast.success("Your nurture and sprout have been removed.")
+                fetchAllData(categories)
+              },
+            },
+            cancel: {
+              label: "Cancel",
+              onClick: () => {},
+            },
+            duration: 8000,
+            closeButton: true,
+            position: "top-left",
+          }
+        )
+        return
+      } else {
+        // Just remove neglect (no sprouts to delete)
+        await supabase
+          .from("project_care_actions")
+          .delete()
+          .match({ project_id: projId, user_address: walletAddress })
+        fetchAllData(categories)
+        return
+      }
     } else {
-      // upsert
+      // upsert - adding/updating care action
       await supabase
         .from("project_care_actions")
         .upsert(
           { project_id: projId, user_address: walletAddress, action },
           { onConflict: "project_id,user_address" }
         )
+      
+      // Award sprouts for nurturing actions
+      if (action === "nurture") {
+        const nurtureTypeId = await getSproutTypeId('nurture')
+        // Award 1 sprout per nurture action
+        const { error: sproutsErr } = await supabase
+          .from("sprouts")
+          .insert({
+            user_address: walletAddress,
+            sprout_type_id: nurtureTypeId,
+            amount: 1,
+            related_id: projId,
+          })
+        
+        if (!sproutsErr) {
+          toast.success("+1 sprout for nurturing! 🌱")
+        } else {
+          console.error("Failed to award nurture sprouts:", sproutsErr)
+        }
+      }
     }
-    fetchData()
+    
+    fetchAllData(categories) // Re-fetch with latest categories
   }
 
   // --- filtering ---
@@ -307,12 +376,14 @@ export default function HomePage() {
 
           {/* — Search */}
           <div className="relative max-w-md mx-auto mb-6 md:mb-8 px-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 w-4 h-4" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center h-full">
+              <Search className="text-emerald-500 w-5 h-5" />
+            </span>
             <Input
               placeholder="Search gardens... 🔍"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 border-emerald-200 focus:border-emerald-400"
+              className="pl-11 border-emerald-200 focus:border-emerald-400 h-11 rounded-full shadow-sm"
             />
           </div>
 
@@ -427,9 +498,9 @@ export default function HomePage() {
                     <button
                       onClick={() => handleCare(idea.id, "nurture")}
                       title="🌱 Nurture this garden"
-                      className="flex items-center gap-1 text-rose-500 hover:text-rose-600 transition p-1 rounded"
+                      className={`flex items-center gap-1 transition p-1 rounded ${idea.userCareAction === 'nurture' ? 'text-emerald-600 hover:text-emerald-700' : 'text-rose-500 hover:text-rose-600'}`}
                     >
-                      <HeartIcon size={16} /> {idea.nurtureCount}
+                      <HeartIcon size={16} className={idea.userCareAction === 'nurture' ? 'fill-emerald-500 text-emerald-600' : ''} /> {idea.nurtureCount}
                     </button>
                     <button
                       onClick={() => handleCare(idea.id, "neglect")}

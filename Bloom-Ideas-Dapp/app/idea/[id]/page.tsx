@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +23,9 @@ import { Progress } from "@/components/ui/progress"
 import ProfilePopup from "@/components/profile-popup"
 import UniversalWalletConnection from "@/components/universal-wallet-connection"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { supabase } from "@/lib/supabaseClient"
+import { toast } from "sonner"
+import { getSproutTypeId } from "@/lib/sprouts"
 
 const mockIdea = {
   id: 1,
@@ -182,7 +185,112 @@ export default function IdeaDetailPage() {
   const [isInterested, setIsInterested] = useState(false)
   const [newComment, setNewComment] = useState("")
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null)
+  const [walletAddress, setWalletAddress] = useState<string>("")
+  const [comments, setComments] = useState<any[]>([])
+  const [submittingComment, setSubmittingComment] = useState(false)
   const isMobile = useIsMobile()
+
+  // Load comments for this idea
+  useEffect(() => {
+    const loadComments = async () => {
+      const { data, error } = await supabase
+        .from("comments")
+        .select(`
+          id,
+          content,
+          created_at,
+          user_address,
+          users!comments_user_address_fkey (
+            bloom_username,
+            wallet_address
+          )
+        `)
+        .eq("project_id", 1) // TODO: Use actual project ID from params
+        .order("created_at", { ascending: false })
+      
+      if (error) {
+        console.error("Error loading comments:", error)
+        return
+      }
+      
+      setComments(data || [])
+    }
+    
+    loadComments()
+  }, [])
+
+  // Handle comment submission
+  const handleSubmitComment = async () => {
+    if (!walletAddress) {
+      toast.error("Connect your wallet first")
+      return
+    }
+    
+    if (!newComment.trim()) {
+      toast.error("Please enter a comment")
+      return
+    }
+
+    setSubmittingComment(true)
+    try {
+      // Insert comment
+      const { data: comment, error: commentErr } = await supabase
+        .from("comments")
+        .insert({
+          project_id: 1, // TODO: Use actual project ID from params
+          user_address: walletAddress,
+          content: newComment.trim(),
+        })
+        .select("id")
+        .single()
+      
+      if (commentErr) throw commentErr
+
+      // Award sprouts for commenting
+      const commentTypeId = await getSproutTypeId('comment')
+      const { error: sproutsErr } = await supabase
+        .from("sprouts")
+        .insert({
+          user_address: walletAddress,
+          sprout_type_id: commentTypeId,
+          amount: 2, // 2 sprouts per comment
+          related_id: comment.id,
+        })
+      
+      if (!sproutsErr) {
+        toast.success("+2 sprouts for your thoughtful comment! 🌱")
+      } else {
+        console.error("Failed to award comment sprouts:", sproutsErr)
+      }
+
+      // Refresh comments
+      const { data: newComments, error: refreshErr } = await supabase
+        .from("comments")
+        .select(`
+          id,
+          content,
+          created_at,
+          user_address,
+          users!comments_user_address_fkey (
+            bloom_username,
+            wallet_address
+          )
+        `)
+        .eq("project_id", 1)
+        .order("created_at", { ascending: false })
+      
+      if (!refreshErr) {
+        setComments(newComments || [])
+      }
+
+      setNewComment("")
+    } catch (error) {
+      console.error("Error submitting comment:", error)
+      toast.error("Failed to submit comment")
+    } finally {
+      setSubmittingComment(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
@@ -202,7 +310,10 @@ export default function IdeaDetailPage() {
                 <span className="font-semibold text-emerald-800 text-sm md:text-base">Bloom Ideas</span>
               </div>
             </div>
-            <UniversalWalletConnection />
+            <UniversalWalletConnection onConnectionChange={(connected, address) => {
+              if (connected && address) setWalletAddress(address)
+              else setWalletAddress("")
+            }} />
           </div>
         </div>
       </header>
@@ -413,35 +524,47 @@ export default function IdeaDetailPage() {
                     onChange={(e) => setNewComment(e.target.value)}
                     className="border-emerald-200 focus:border-emerald-400 focus:ring-emerald-400/20 text-sm md:text-base"
                   />
-                  <Button className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-sm md:text-base">
+                  <Button 
+                    onClick={handleSubmitComment}
+                    disabled={submittingComment}
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-sm md:text-base"
+                  >
                     <MessageCircle className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                    Add Feedback
+                    {submittingComment ? "Posting..." : "Add Feedback"}
                   </Button>
                 </div>
 
                 {/* Comments List */}
                 <div className="space-y-3 md:space-y-4">
-                  {mockComments.map((comment) => (
-                    <div key={comment.id} className="border-l-2 border-emerald-200 pl-3 md:pl-4 py-2">
-                      <div className="flex items-center gap-1 md:gap-2 mb-1 md:mb-2">
-                        <Avatar className="w-4 h-4 md:w-5 md:h-5">
-                          <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">
-                            {comment.authorName.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium text-emerald-800 text-sm md:text-base">{comment.authorName}</span>
-                        <span className="text-xs md:text-sm text-emerald-600/70">•</span>
-                        <span className="text-xs md:text-sm text-emerald-600/70">{comment.createdAt}</span>
-                      </div>
-                      <p className="text-emerald-800/90 mb-1 md:mb-2 text-sm md:text-base">{comment.content}</p>
-                      <div className="flex items-center gap-1 md:gap-2">
-                        <Button size="sm" variant="ghost" className="text-emerald-600 hover:bg-emerald-50 h-5 md:h-6 px-1 md:px-2">
-                          <Heart className="w-2 h-2 md:w-3 md:h-3 mr-1" />
-                          {comment.votes}
-                        </Button>
-                      </div>
+                  {comments.length === 0 ? (
+                    <div className="text-center py-6 text-emerald-600/70">
+                      <MessageCircle className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
+                      <p>No comments yet. Be the first to share your thoughts!</p>
                     </div>
-                  ))}
+                  ) : (
+                    comments.map((comment) => {
+                      const authorName = comment.users?.bloom_username || 
+                        `${comment.user_address.slice(0, 6)}...${comment.user_address.slice(-4)}`
+                      const initials = authorName.slice(0, 2).toUpperCase()
+                      const timeAgo = new Date(comment.created_at).toLocaleDateString()
+                      
+                      return (
+                        <div key={comment.id} className="border-l-2 border-emerald-200 pl-3 md:pl-4 py-2">
+                          <div className="flex items-center gap-1 md:gap-2 mb-1 md:mb-2">
+                            <Avatar className="w-4 h-4 md:w-5 md:h-5">
+                              <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">
+                                {initials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-emerald-800 text-sm md:text-base">{authorName}</span>
+                            <span className="text-xs md:text-sm text-emerald-600/70">•</span>
+                            <span className="text-xs md:text-sm text-emerald-600/70">{timeAgo}</span>
+                          </div>
+                          <p className="text-emerald-800/90 mb-1 md:mb-2 text-sm md:text-base">{comment.content}</p>
+                        </div>
+                      )
+                    })
+                  )}
                 </div>
               </CardContent>
             </Card>

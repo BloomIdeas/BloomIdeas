@@ -16,6 +16,7 @@ import MessageSigningModal from './message-signing-modal'
 import { useSignatureVerification } from '@/hooks/use-signature-verification'
 import { supabase } from '@/lib/supabaseClient'  // your initialized client
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useSprouts } from "@/hooks/use-sprouts"
 
 interface UniversalWalletConnectionProps {
   onConnectionChange?: (isConnected: boolean, address?: string) => void
@@ -43,6 +44,11 @@ export default function UniversalWalletConnection({
     verifySignature,
     clearSignature,
   } = useSignatureVerification()
+
+  const {
+    totalSprouts,
+    loading: sproutsLoading,
+  } = useSprouts(address ?? null)
 
   // ensure we only run in browser
   useEffect(() => {
@@ -285,8 +291,14 @@ export default function UniversalWalletConnection({
                 </span>
               </div>
               <div className="flex justify-between text-emerald-700 text-xs md:text-sm">
-                <span>Garden Sprouts</span>
-                <span className="font-medium text-emerald-900">342 🌱</span>
+                <span>Sprouts Earned</span>
+                {sproutsLoading ? (
+                  <span className="font-medium text-emerald-900">...</span>
+                ) : totalSprouts > 0 ? (
+                  <span className="font-medium text-emerald-900">{totalSprouts} 🌱</span>
+                ) : (
+                  <span className="font-medium text-emerald-900">Plant ideas, nurture to earn sprouts</span>
+                )}
               </div>
               <div className="flex justify-between text-emerald-700 text-xs md:text-sm">
                 <span>Network</span>

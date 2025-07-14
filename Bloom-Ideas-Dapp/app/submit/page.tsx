@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { calculateSproutsForSubmission, getSproutTypeId } from "@/lib/sprouts"
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -140,7 +141,18 @@ export default function SubmitIdeaPage() {
 
     setSubmitting(true)
     try {
-      // 1) Insert project
+      // 1) Count existing projects by this user to calculate sprouts
+      const { data: existingProjects, error: countErr } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("owner_address", walletAddress)
+      
+      if (countErr) throw countErr
+      
+      const projectCount = existingProjects?.length || 0
+      const sproutsAmount = calculateSproutsForSubmission(projectCount)
+
+      // 2) Insert project
       const { data: proj, error: projErr } = await supabase
         .from("projects")
         .insert({
@@ -154,35 +166,51 @@ export default function SubmitIdeaPage() {
 
       const pid = proj.id
 
-      // 2) Link categories
+      // 3) Award sprouts for planting the idea
+      const plantIdeaTypeId = await getSproutTypeId('plant_idea')
+      const { error: sproutsErr } = await supabase
+        .from("sprouts")
+        .insert({
+          user_address: walletAddress,
+          sprout_type_id: plantIdeaTypeId,
+          amount: sproutsAmount,
+          related_id: pid,
+        })
+      
+      if (sproutsErr) {
+        console.error("Failed to award sprouts:", sproutsErr)
+        // Don't throw here - we still want the project to be created
+      }
+
+      // 4) Link categories
       await Promise.all(
         formData.categoryIds.map((cid) =>
           supabase.from("project_categories").insert({ project_id: pid, category_id: cid })
         )
       )
 
-      // 3) Link tech stacks
+      // 5) Link tech stacks
       await Promise.all(
         formData.techStackIds.map((tid) =>
           supabase.from("project_tech_stacks").insert({ project_id: pid, tech_stack_id: tid })
         )
       )
 
-      // 4) Insert related links
+      // 6) Insert related links
       await Promise.all(
         formData.links.map(({ url, label }) =>
           supabase.from("project_links").insert({ project_id: pid, url, label })
         )
       )
 
-      // 5) Insert visuals
+      // 7) Insert visuals
       await Promise.all(
         formData.visuals.map(({ url, alt }) =>
           supabase.from("project_visuals").insert({ project_id: pid, url, alt_text: alt })
         )
       )
 
-      toast.success("Your idea has been planted! 🌱")
+      toast.success(`Your idea has been planted! 🌱 +${sproutsAmount} sprouts earned!`)
       router.push("/") // back to garden
     } catch (e) {
       console.error(e)

@@ -29,6 +29,8 @@ import { useSignatureVerification } from "@/hooks/use-signature-verification"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import EmojiPicker from "@/components/emoji-picker"
+import { useSprouts } from "@/hooks/use-sprouts"
+import { getReputationLevel } from "@/lib/sprouts"
 
 // Types
 interface UserProfile {
@@ -73,6 +75,8 @@ export default function MyProfilePage() {
 
   const { address, isConnected } = useAccount()
   const { hasVerifiedSignature } = useSignatureVerification()
+  const { totalSprouts, sproutsByType, loading } = useSprouts(address)
+  const reputationLevel = getReputationLevel(totalSprouts)
 
   // Check if user is authenticated
   const isAuthenticated = isConnected && hasVerifiedSignature && address

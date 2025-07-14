@@ -21,88 +21,23 @@ import {
   Flower2,
   Sparkles,
 } from "lucide-react"
+import { useSprouts } from "@/hooks/use-sprouts"
+import { getReputationLevel } from "@/lib/sprouts"
 
 interface ProfilePopupProps {
   address: string
   onClose: () => void
 }
 
-const mockProfile = {
-  address: "0x1234...5678",
-  ensName: "builder.eth",
-  avatar: "/placeholder.svg?height=120&width=120",
-  displayName: "Garden Builder",
-  bio: " Web3 developer cultivating the future of DeFi. Love building beautiful, functional protocols that make crypto accessible to everyone. 🌱",
-  reputation: "Grove-Keeper",
-  reputationLevel: 4,
-  joinDate: "March 2023",
-  location: "San Francisco, CA",
-  website: "https://gardenbuilder.dev",
-  social: {
-    github: "gardenbuilder",
-    twitter: "gardenbuilder_",
-    discord: "gardenbuilder#1234",
-  },
-  stats: {
-    ideasSubmitted: 12,
-    ideasBuilt: 8,
-    votesGiven: 156,
-    commentsPosted: 89,
-    sprouts: 342,
-    currentStreak: 15,
-    longestStreak: 28,
-  },
-  nfts: [
-    {
-      id: 1,
-      name: "Seed Planter",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Common",
-      description: "First idea planted in the garden",
-      earned: "Dec 2023",
-    },
-    {
-      id: 2,
-      name: "First Bloom",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Rare",
-      description: "First idea successfully built",
-      earned: "Jan 2024",
-    },
-    {
-      id: 3,
-      name: "Grove Keeper",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Epic",
-      description: "Reached Grove-Keeper reputation",
-      earned: "Feb 2024",
-    },
-    {
-      id: 4,
-      name: "Innovation Catalyst",
-      image: "/placeholder.svg?height=100&width=100",
-      rarity: "Legendary",
-      description: "Inspired 10+ builders to join projects",
-      earned: "Mar 2024",
-    },
-  ],
-}
-
-const reputationLevels = [
-  { name: "Seed", level: 1, color: "bg-yellow-400", sproutsNeeded: 0 },
-  { name: "Sprout", level: 2, color: "bg-green-400", sproutsNeeded: 50 },
-  { name: "Bloom", level: 3, color: "bg-emerald-400", sproutsNeeded: 150 },
-  { name: "Grove-Keeper", level: 4, color: "bg-teal-400", sproutsNeeded: 300 },
-  { name: "Garden Master", level: 5, color: "bg-purple-400", sproutsNeeded: 500 },
-]
-
 export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
   const [activeTab, setActiveTab] = useState("overview")
-  const currentLevel = reputationLevels.find((level) => level.level === mockProfile.reputationLevel)
-  const nextLevel = reputationLevels.find((level) => level.level === mockProfile.reputationLevel + 1)
+  const { totalSprouts, sproutsByType, loading } = useSprouts(address)
+  const reputationLevel = getReputationLevel(totalSprouts)
+  const currentLevel = reputationLevel
+  const nextLevel = reputationLevel.nextLevel
   const progressToNext = nextLevel
-    ? ((mockProfile.stats.sprouts - currentLevel!.sproutsNeeded) /
-        (nextLevel.sproutsNeeded - currentLevel!.sproutsNeeded)) *
+    ? ((totalSprouts - currentLevel.sproutsNeeded) /
+        (nextLevel.sproutsNeeded - currentLevel.sproutsNeeded)) *
       100
     : 100
 
@@ -125,23 +60,23 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
           {/* Profile Header */}
           <div className="flex flex-col md:flex-row items-start gap-6 -mt-10">
             <Avatar className="w-20 h-20 border-4 border-white shadow-lg">
-              <AvatarImage src={mockProfile.avatar || "/placeholder.svg"} alt={mockProfile.displayName} />
+              <AvatarImage src={"/placeholder.svg"} alt="User Avatar" />
               <AvatarFallback className="text-xl bg-emerald-100 text-emerald-700">GB</AvatarFallback>
             </Avatar>
 
             <div className="flex-1 pt-8 md:pt-2">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
                 <div>
-                  <h1 className="text-2xl font-bold text-emerald-900 mb-1">{mockProfile.displayName}</h1>
+                  <h1 className="text-2xl font-bold text-emerald-900 mb-1">Garden Builder</h1>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-emerald-700 font-medium">{mockProfile.ensName}</span>
-                    <span className="text-emerald-600/70">({mockProfile.address})</span>
+                    <span className="text-emerald-700 font-medium">builder.eth</span>
+                    <span className="text-emerald-600/70">({address})</span>
                     <Badge className={`${currentLevel?.color} text-white border-0`}>
                       <Crown className="w-3 h-3 mr-1" />
-                      {mockProfile.reputation}
+                      {reputationLevel.name}
                     </Badge>
                   </div>
-                  <p className="text-emerald-800/80 max-w-2xl text-sm">{mockProfile.bio}</p>
+                  <p className="text-emerald-800/80 max-w-2xl text-sm">Web3 developer cultivating the future of DeFi. Love building beautiful, functional protocols that make crypto accessible to everyone. 🌱</p>
                 </div>
 
                 <div className="flex items-center gap-2 mt-4 md:mt-0">
@@ -164,7 +99,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               {/* Social Links */}
               <div className="flex items-center gap-4 mb-4">
                 <a
-                  href={`https://github.com/${mockProfile.social.github}`}
+                  href="https://github.com/gardenbuilder"
                   className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -173,7 +108,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
                   <span className="text-sm">@{mockProfile.social.github}</span>
                 </a>
                 <a
-                  href={`https://twitter.com/${mockProfile.social.twitter}`}
+                  href="https://twitter.com/gardenbuilder_"
                   className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 transition-colors"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -191,14 +126,14 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               <div className="bg-emerald-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-emerald-800">Garden Growth</span>
-                  <span className="text-sm text-emerald-600">{mockProfile.stats.sprouts} Sprouts</span>
+                  <span className="text-sm text-emerald-600">{totalSprouts} Sprouts</span>
                 </div>
                 <Progress value={progressToNext} className="h-2 mb-2" />
                 <div className="flex justify-between text-xs text-emerald-600/70">
                   <span>{currentLevel?.name}</span>
                   {nextLevel && (
                     <span>
-                      {nextLevel.sproutsNeeded - mockProfile.stats.sprouts} to {nextLevel.name}
+                      {nextLevel.sproutsNeeded - totalSprouts} to {nextLevel.name}
                     </span>
                   )}
                 </div>
@@ -212,7 +147,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-2">
                 <Code className="w-4 h-4 text-blue-600" />
               </div>
-              <p className="text-lg font-bold text-emerald-900">{mockProfile.stats.ideasSubmitted}</p>
+              <p className="text-lg font-bold text-emerald-900">12</p>
               <p className="text-xs text-emerald-600/70">Ideas Planted</p>
             </div>
 
@@ -220,7 +155,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               <div className="w-8 h-8 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center mx-auto mb-2">
                 <Trophy className="w-4 h-4 text-green-600" />
               </div>
-              <p className="text-lg font-bold text-emerald-900">{mockProfile.stats.ideasBuilt}</p>
+              <p className="text-lg font-bold text-emerald-900">8</p>
               <p className="text-xs text-emerald-600/70">Ideas Built</p>
             </div>
 
@@ -228,7 +163,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               <div className="w-8 h-8 bg-gradient-to-br from-rose-100 to-rose-200 rounded-full flex items-center justify-center mx-auto mb-2">
                 <Heart className="w-4 h-4 text-rose-600" />
               </div>
-              <p className="text-lg font-bold text-emerald-900">{mockProfile.stats.votesGiven}</p>
+              <p className="text-lg font-bold text-emerald-900">156</p>
               <p className="text-xs text-emerald-600/70">Votes Cast</p>
             </div>
 
@@ -236,7 +171,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               <div className="w-8 h-8 bg-gradient-to-br from-orange-100 to-orange-200 rounded-full flex items-center justify-center mx-auto mb-2">
                 <Zap className="w-4 h-4 text-orange-600" />
               </div>
-              <p className="text-lg font-bold text-emerald-900">{mockProfile.stats.currentStreak}</p>
+              <p className="text-lg font-bold text-emerald-900">15</p>
               <p className="text-xs text-emerald-600/70">Day Streak</p>
             </div>
           </div>
@@ -304,7 +239,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
                   <div className="relative z-10">
                     <div className="grid grid-cols-8 gap-2 max-w-sm mx-auto mb-4">
                       {Array.from({ length: 32 }).map((_, i) => {
-                        const isBloomedPetal = i < Math.floor(mockProfile.stats.sprouts / 11)
+                        const isBloomedPetal = i < Math.floor(totalSprouts / 11)
                         const animationDelay = `${(i * 0.1) % 2}s`
 
                         return (
@@ -332,7 +267,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
                         </div>
                         <div>
                           <p className="text-lg font-bold text-emerald-900">
-                            {Math.floor(mockProfile.stats.sprouts / 11)} Petals Bloomed
+                            {Math.floor(totalSprouts / 11)} Petals Bloomed
                           </p>
                         </div>
                       </div>
@@ -381,7 +316,7 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-emerald-900">🎨 Invisible Gardens NFT Collection</h3>
                 <Badge variant="outline" className="border-emerald-200 text-emerald-700">
-                  {mockProfile.nfts.length} Blooms Earned
+                  {totalSprouts} Blooms Earned
                 </Badge>
               </div>
               <p className="text-emerald-700/70 text-sm mb-6">
@@ -389,50 +324,53 @@ export default function ProfilePopup({ address, onClose }: ProfilePopupProps) {
               </p>
 
               <div className="grid gap-4 md:grid-cols-2">
-                {mockProfile.nfts.map((nft) => (
-                  <Card key={nft.id} className="border-emerald-100 hover:shadow-lg transition-all duration-300 group">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform">
-                          <Flower2 className="w-8 h-8 text-emerald-600" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold text-emerald-900">{nft.name}</h4>
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                nft.rarity === "Legendary"
-                                  ? "border-purple-300 text-purple-700 bg-purple-50"
-                                  : nft.rarity === "Epic"
-                                    ? "border-orange-300 text-orange-700 bg-orange-50"
-                                    : nft.rarity === "Rare"
-                                      ? "border-blue-300 text-blue-700 bg-blue-50"
-                                      : "border-gray-300 text-gray-700 bg-gray-50"
-                              }`}
-                            >
-                              {nft.rarity}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-emerald-700/80 mb-2">{nft.description}</p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-emerald-600/70">Earned {nft.earned}</span>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs bg-transparent">
-                                <ExternalLink className="w-3 h-3 mr-1" />
-                                View
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-6 px-2 text-xs bg-transparent">
-                                <Sparkles className="w-3 h-3 mr-1" />
-                                Mint
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {/* This section needs to be updated to use sproutsByType and totalSprouts */}
+                {/* For now, keeping the structure but noting the data source change */}
+                {/* Example: */}
+                {/* {Object.entries(sproutsByType).map(([type, count]) => ( */}
+                {/*   <Card key={type} className="border-emerald-100 hover:shadow-lg transition-all duration-300 group"> */}
+                {/*     <CardContent className="p-4"> */}
+                {/*       <div className="flex items-start gap-4"> */}
+                {/*         <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-lg flex items-center justify-center group-hover:scale-105 transition-transform"> */}
+                {/*           <Flower2 className="w-8 h-8 text-emerald-600" /> */}
+                {/*         </div> */}
+                {/*         <div className="flex-1"> */}
+                {/*           <div className="flex items-center justify-between mb-2"> */}
+                {/*             <h4 className="font-semibold text-emerald-900">{type}</h4> */}
+                {/*             <Badge */}
+                {/*               variant="outline" */}
+                {/*               className={`text-xs ${ */}
+                {/*                 type === "Legendary" */}
+                {/*                   ? "border-purple-300 text-purple-700 bg-purple-50" */}
+                {/*                   : type === "Epic" */}
+                {/*                     ? "border-orange-300 text-orange-700 bg-orange-50" */}
+                {/*                     : type === "Rare" */}
+                {/*                       ? "border-blue-300 text-blue-700 bg-blue-50" */}
+                {/*                       : "border-gray-300 text-gray-700 bg-gray-50" */}
+                {/*               }`} */}
+                {/*             > */}
+                {/*               {type} */}
+                {/*             </Badge> */}
+                {/*           </div> */}
+                {/*           <p className="text-sm text-emerald-700/80 mb-2">Description for {type}</p> */}
+                {/*           <div className="flex items-center justify-between"> */}
+                {/*             <span className="text-xs text-emerald-600/70">Earned {count}</span> */}
+                {/*             <div className="flex gap-2"> */}
+                {/*               <Button size="sm" variant="outline" className="h-6 px-2 text-xs bg-transparent"> */}
+                {/*                 <ExternalLink className="w-3 h-3 mr-1" /> */}
+                {/*                 View */}
+                {/*               </Button> */}
+                {/*               <Button size="sm" variant="outline" className="h-6 px-2 text-xs bg-transparent"> */}
+                {/*                 <Sparkles className="w-3 h-3 mr-1" /> */}
+                {/*                 Mint */}
+                {/*               </Button> */}
+                {/*             </div> */}
+                {/*           </div> */}
+                {/*         </div> */}
+                {/*       </div> */}
+                {/*     </CardContent> */}
+                {/*   </Card> */}
+                {/* ))} */}
               </div>
 
               {/* Next Milestone */}
