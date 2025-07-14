@@ -21,7 +21,7 @@ export async function getUserTotalSprouts(userAddress: string): Promise<number> 
   const { data, error } = await supabase
     .from("user_sprout_totals")
     .select("total_sprouts")
-    .eq("wallet_address", userAddress)
+    .eq("user", userAddress) // <-- FIXED COLUMN NAME
     .single()
   if (error || !data) return 0
   return data.total_sprouts || 0
@@ -32,7 +32,7 @@ export async function getUserSproutsByType(userAddress: string): Promise<Record<
   const { data, error } = await supabase
     .from("user_sprout_totals")
     .select("nurtures, neglects, planted_ideas, comments, build_requests, invites")
-    .eq("wallet_address", userAddress)
+    .eq("user", userAddress) // <-- FIXED COLUMN NAME
     .single()
   if (error || !data) return {}
   return {

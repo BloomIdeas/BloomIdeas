@@ -12,6 +12,7 @@ import { useSprouts } from "@/hooks/use-sprouts"
 import { getReputationLevel } from "@/lib/sprouts"
 import SproutsDashboard from "./sprouts-dashboard"
 import { supabase } from "@/lib/supabaseClient"
+import { useGardenTheme } from './garden-theme-context';
 
 // Helper: random name generator
 const randomNames = [
@@ -35,7 +36,7 @@ interface GardenExplorerProps {
 export default function GardenExplorer({ walletAddress }: GardenExplorerProps) {
   const [showGardenDropdown, setShowGardenDropdown] = useState(false)
   const [showSproutsDashboard, setShowSproutsDashboard] = useState(false)
-  const [gardenTheme, setGardenTheme] = useState("spring") // spring, summer, autumn, winter
+  const { gardenTheme, setGardenTheme } = useGardenTheme();
   const isMobile = useIsMobile()
   const [username, setUsername] = useState<string>("")
   const [showSproutsModal, setShowSproutsModal] = useState(false)

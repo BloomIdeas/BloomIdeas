@@ -213,3 +213,8 @@
 .season-winter {
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
 }
+
+/* Custom: More space between paragraphs in Markdown preview */
+.prose p {
+  margin-bottom: 1.25em;
+}

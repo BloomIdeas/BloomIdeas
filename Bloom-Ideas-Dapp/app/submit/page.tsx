@@ -27,6 +27,7 @@ import {
   Upload,
 } from "lucide-react"
 import { SeasonalBackground, FloatingGardenElements, GardenWeather } from "@/components/garden-elements"
+import { useGardenTheme } from '@/components/garden-theme-context';
 
 interface Category { id: number; name: string }
 interface TechStack { id: number; name: string }
@@ -34,6 +35,21 @@ interface TechStack { id: number; name: string }
 export default function SubmitIdeaPage() {
   const router = useRouter()
   const isMobile = useIsMobile()
+  const { gardenTheme } = useGardenTheme();
+  const getThemeHeaderGradient = () => {
+    switch (gardenTheme) {
+      case 'spring':
+        return 'bg-white/80';
+      case 'summer':
+        return 'bg-gradient-to-r from-yellow-50/80 to-orange-100/80';
+      case 'autumn':
+        return 'bg-gradient-to-r from-orange-50/80 to-red-100/80';
+      case 'winter':
+        return 'bg-gradient-to-r from-blue-50/80 to-purple-100/80';
+      default:
+        return 'bg-white/80';
+    }
+  };
 
   // Loaded from Supabase
   const [categories, setCategories] = useState<Category[]>([])
@@ -43,7 +59,14 @@ export default function SubmitIdeaPage() {
   const [walletAddress, setWalletAddress] = useState<string>("")
   const [formData, setFormData] = useState({
     title: "",
-    description: "",
+    // --- Split description into guided sections ---
+    problem: "",
+    vision: "",
+    features: "",
+    tech: "",
+    targetUsers: "",
+    unique: "",
+    // ---
     categoryIds: [] as number[],
     techStackIds: [] as number[],
     links: [] as { url: string; label: string }[],
@@ -130,8 +153,9 @@ export default function SubmitIdeaPage() {
       toast.error("Connect your wallet first")
       return
     }
-    if (!formData.title.trim() || !formData.description.trim()) {
-      toast.error("Title & description are required")
+    // --- Validate all description sections ---
+    if (!formData.title.trim() || !formData.problem.trim() || !formData.vision.trim() || !formData.features.trim() || !formData.tech.trim() || !formData.targetUsers.trim() || !formData.unique.trim()) {
+      toast.error("Please fill out all idea detail sections")
       return
     }
     if (formData.categoryIds.length === 0) {
@@ -152,13 +176,16 @@ export default function SubmitIdeaPage() {
       const projectCount = existingProjects?.length || 0
       const sproutsAmount = calculateSproutsForSubmission(projectCount)
 
+      // --- Compile description from sections ---
+      const compiledDescription = `## What problem does your idea solve?\n${formData.problem}\n\n## Vision\n${formData.vision}\n\n## Features\n${formData.features}\n\n## Tech\n${formData.tech}\n\n## Who is it for? (target users, impact)\n${formData.targetUsers}\n\n## What makes it unique?\n${formData.unique}`
+
       // 2) Insert project
       const { data: proj, error: projErr } = await supabase
         .from("projects")
         .insert({
           owner_address: walletAddress,
           title: formData.title,
-          description: formData.description,
+          description: compiledDescription,
         })
         .select("id")
         .single()
@@ -222,11 +249,11 @@ export default function SubmitIdeaPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
-      <SeasonalBackground season="spring" />
+      <SeasonalBackground season={gardenTheme} />
       <FloatingGardenElements />
       
       {/* Header */}
-      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className={`border-b border-emerald-200/50 ${getThemeHeaderGradient()} backdrop-blur-sm sticky top-0 z-50`}>
         <div className="container mx-auto px-4 py-3 md:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 md:gap-4">
@@ -291,7 +318,7 @@ export default function SubmitIdeaPage() {
             {/* Description */}
             <div>
               <Label htmlFor="description" className="text-emerald-800 font-medium text-sm md:text-base">
-                Description *
+                Idea Details *
               </Label>
               <Tabs defaultValue="edit" className="w-full mt-2">
                 <TabsList className="bg-emerald-50 mb-2">
@@ -299,31 +326,96 @@ export default function SubmitIdeaPage() {
                   <TabsTrigger value="preview" className="text-xs md:text-sm">Preview</TabsTrigger>
                 </TabsList>
                 <TabsContent value="edit">
-                  <Textarea
-                    id="description"
-                    placeholder="Describe your idea in detail... (Markdown supported)"
-                    value={formData.description}
-                    onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
-                    className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[120px] text-sm md:text-base"
-                    rows={6}
-                  />
-                  <div className="text-xs text-emerald-600 mt-2">
-                    <span className="font-semibold">Tip:</span> Use Markdown for formatting. For a great description, include:
-                    <ul className="list-disc ml-4 md:ml-5 mt-1">
-                      <li>What problem does your idea solve?</li>
-                      <li>How does it work? (features, tech, vision)</li>
-                      <li>Who is it for? (target users, impact)</li>
-                      <li>What makes it unique?</li>
-                      <li>Use <code>**bold**</code>, <code># headings</code>, <code>- lists</code>, <code>[links](url)</code>, etc.</li>
-                    </ul>
+                  <div className="space-y-4">
+                    {/* Problem */}
+                    <div>
+                      <Label className="text-emerald-700 font-medium">What problem does your idea solve?</Label>
+                      <Textarea
+                        placeholder="Describe the core problem your idea addresses..."
+                        value={formData.problem}
+                        onChange={e => setFormData(f => ({ ...f, problem: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[60px] text-sm md:text-base mt-1"
+                        rows={3}
+                      />
+                      <div className="text-xs text-emerald-600 mt-1">E.g. What pain point or gap are you solving?</div>
+                    </div>
+                    {/* Vision */}
+                    <div>
+                      <Label className="text-emerald-700 font-medium">Vision</Label>
+                      <Textarea
+                        placeholder="Share your vision for this idea..."
+                        value={formData.vision}
+                        onChange={e => setFormData(f => ({ ...f, vision: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[60px] text-sm md:text-base mt-1"
+                        rows={3}
+                      />
+                      <div className="text-xs text-emerald-600 mt-1">E.g. What is your long-term goal or dream for this idea?</div>
+                    </div>
+                    {/* Features */}
+                    <div>
+                      <Label className="text-emerald-700 font-medium">Features</Label>
+                      <Textarea
+                        placeholder="List the main features..."
+                        value={formData.features}
+                        onChange={e => setFormData(f => ({ ...f, features: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[60px] text-sm md:text-base mt-1"
+                        rows={3}
+                      />
+                      <div className="text-xs text-emerald-600 mt-1">E.g. What are the key functionalities?</div>
+                    </div>
+                    {/* Tech */}
+                    <div>
+                      <Label className="text-emerald-700 font-medium">Tech</Label>
+                      <Textarea
+                        placeholder="Describe the technology or stack..."
+                        value={formData.tech}
+                        onChange={e => setFormData(f => ({ ...f, tech: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[60px] text-sm md:text-base mt-1"
+                        rows={3}
+                      />
+                      <div className="text-xs text-emerald-600 mt-1">E.g. What tech/tools will you use?</div>
+                    </div>
+                    {/* Target Users */}
+                    <div>
+                      <Label className="text-emerald-700 font-medium">Who is it for? (Target users, impact)</Label>
+                      <Textarea
+                        placeholder="Describe your target users and the impact..."
+                        value={formData.targetUsers}
+                        onChange={e => setFormData(f => ({ ...f, targetUsers: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[60px] text-sm md:text-base mt-1"
+                        rows={3}
+                      />
+                      <div className="text-xs text-emerald-600 mt-1">E.g. Who benefits? What is the impact?</div>
+                    </div>
+                    {/* Unique */}
+                    <div>
+                      <Label className="text-emerald-700 font-medium">What makes it unique?</Label>
+                      <Textarea
+                        placeholder="Explain what sets your idea apart..."
+                        value={formData.unique}
+                        onChange={e => setFormData(f => ({ ...f, unique: e.target.value }))}
+                        className="border-emerald-200 focus:border-emerald-400 font-mono min-h-[60px] text-sm md:text-base mt-1"
+                        rows={3}
+                      />
+                      <div className="text-xs text-emerald-600 mt-1">E.g. Why is this idea different or special?</div>
+                    </div>
                   </div>
                 </TabsContent>
                 <TabsContent value="preview">
                   <div className="prose prose-emerald max-w-none bg-emerald-50/50 p-3 md:p-4 rounded-md border border-emerald-100 min-h-[120px] text-sm md:text-base">
-                    {formData.description.trim() ? (
-                      <ReactMarkdown>{formData.description}</ReactMarkdown>
+                    {(
+                      formData.problem.trim() ||
+                      formData.vision.trim() ||
+                      formData.features.trim() ||
+                      formData.tech.trim() ||
+                      formData.targetUsers.trim() ||
+                      formData.unique.trim()
+                    ) ? (
+                      <ReactMarkdown>{`
+## What problem does your idea solve?\n${formData.problem}\n\n## Vision\n${formData.vision}\n\n## Features\n${formData.features}\n\n## Tech\n${formData.tech}\n\n## Who is it for? (target users, impact)\n${formData.targetUsers}\n\n## What makes it unique?\n${formData.unique}
+                      `}</ReactMarkdown>
                     ) : (
-                      <span className="text-emerald-400">Nothing to preview yet. Start writing your idea description in Markdown!</span>
+                      <span className="text-emerald-400">Nothing to preview yet. Start filling out the sections above!</span>
                     )}
                   </div>
                 </TabsContent>

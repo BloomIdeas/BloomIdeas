@@ -27,6 +27,7 @@ import Link from "next/link"
 import { useSprouts } from "@/hooks/use-sprouts"
 import { getReputationLevel } from "@/lib/sprouts"
 import { useParams } from "next/navigation"
+import { useGardenTheme } from '@/components/garden-theme-context';
 
 export default function ProfilePage() {
   const params = useParams();
@@ -47,11 +48,26 @@ export default function ProfilePage() {
   const progressToNext = nextLevel
     ? ((totalSprouts - reputationLevel.sproutsNeeded) / (nextLevel.sproutsNeeded - reputationLevel.sproutsNeeded)) * 100
     : 100;
+  const { gardenTheme } = useGardenTheme();
+  const getThemeHeaderGradient = () => {
+    switch (gardenTheme) {
+      case 'spring':
+        return 'bg-white/80';
+      case 'summer':
+        return 'bg-gradient-to-r from-yellow-50/80 to-orange-100/80';
+      case 'autumn':
+        return 'bg-gradient-to-r from-orange-50/80 to-red-100/80';
+      case 'winter':
+        return 'bg-gradient-to-r from-blue-50/80 to-purple-100/80';
+      default:
+        return 'bg-white/80';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       {/* Header */}
-      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className={`border-b border-emerald-200/50 ${getThemeHeaderGradient()} backdrop-blur-sm sticky top-0 z-50`}>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

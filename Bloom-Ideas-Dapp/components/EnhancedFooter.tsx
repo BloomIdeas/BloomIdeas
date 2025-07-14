@@ -3,16 +3,27 @@
 
 import Link from 'next/link'
 import { Flower2 } from 'lucide-react'
+import { useGardenTheme } from './garden-theme-context';
 
 export default function EnhancedFooter() {
+  const { gardenTheme } = useGardenTheme();
+  const getThemeGradient = () => {
+    switch (gardenTheme) {
+      case 'spring':
+        return 'bg-gradient-to-r from-emerald-50/80 to-teal-50/80';
+      case 'summer':
+        return 'bg-gradient-to-r from-yellow-50/80 to-orange-100/80';
+      case 'autumn':
+        return 'bg-gradient-to-r from-orange-50/80 to-red-100/80';
+      case 'winter':
+        return 'bg-gradient-to-r from-blue-50/80 to-purple-100/80';
+      default:
+        return 'bg-gradient-to-r from-emerald-50/80 to-teal-50/80';
+    }
+  };
   return (
     <footer
-      className="
-        mt-20 border-t border-emerald-200/50
-        bg-gradient-to-r from-emerald-50/80 to-teal-50/80
-        backdrop-blur-sm rounded-t-2xl
-        animate-fade-in-up
-      "
+      className={`mt-20 border-t border-emerald-200/50 ${getThemeGradient()} backdrop-blur-sm rounded-t-2xl animate-fade-in-up`}
     >
       <div className="container mx-auto px-4 py-8 space-y-6">
         {/* Top Row */}

@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getReputationLevel, getSproutTypeId } from "@/lib/sprouts"
+import { useGardenTheme } from '@/components/garden-theme-context';
 
 import {
   Search,
@@ -69,8 +70,26 @@ export default function HomePage() {
   const [selectedIdea, setSelectedIdea] = useState<Project| null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [modalLinks, setModalLinks] = useState<any[]>([]);
+  const [modalVisuals, setModalVisuals] = useState<any[]>([]);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const isMobile = useIsMobile()
+  const { gardenTheme } = useGardenTheme();
+  const getThemeHeaderGradient = () => {
+    switch (gardenTheme) {
+      case 'spring':
+        return 'bg-white/80';
+      case 'summer':
+        return 'bg-gradient-to-r from-yellow-50/80 to-orange-100/80';
+      case 'autumn':
+        return 'bg-gradient-to-r from-orange-50/80 to-red-100/80';
+      case 'winter':
+        return 'bg-gradient-to-r from-blue-50/80 to-purple-100/80';
+      default:
+        return 'bg-white/80';
+    }
+  };
 
   // --- Load everything from Supabase ---
   async function fetchAllData(latestCategories: Category[]) {
@@ -272,13 +291,26 @@ export default function HomePage() {
     bloomed: "🌸 Bloomed",
   } as const
 
+  const handleOpenIdeaModal = async (idea: any) => {
+    setModalLoading(true);
+    setSelectedIdea(idea);
+    // Fetch links and visuals for the idea
+    const [{ data: links }, { data: visuals }] = await Promise.all([
+      supabase.from("project_links").select("*").eq("project_id", idea.id).order("created_at", { ascending: true }),
+      supabase.from("project_visuals").select("*").eq("project_id", idea.id).order("created_at", { ascending: true })
+    ]);
+    setModalLinks(links || []);
+    setModalVisuals(visuals || []);
+    setModalLoading(false);
+  };
+
   return (
     <div className="min-h-screen relative">
-      <SeasonalBackground season="spring" />
+      <SeasonalBackground season={gardenTheme} />
       <FloatingGardenElements />
 
       {/* ================= HEADER ================= */}
-      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className={`border-b border-emerald-200/50 ${getThemeHeaderGradient()} backdrop-blur-sm sticky top-0 z-50`}>
         <div className="container mx-auto px-4 py-4">
           {/* Desktop Header */}
           <div className="hidden md:flex items-center justify-between">
@@ -451,9 +483,10 @@ export default function HomePage() {
             >
               <div className="p-4 md:p-5 space-y-3 md:space-y-4">
                 <div className="flex justify-between items-start gap-2">
-                  <h3 className="text-base md:text-lg font-semibold text-emerald-900 flex-1">
-                    {idea.title}
-                  </h3>
+                  {/* Render title as markdown */}
+                  <span className="text-xl font-bold text-emerald-900">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={{p: 'span'}}>{idea.title}</ReactMarkdown>
+                  </span>
                   <span
                     className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium capitalize flex-shrink-0 ${
                       {
@@ -521,7 +554,7 @@ export default function HomePage() {
                 </div>
 
                 <Button
-                  onClick={() => setSelectedIdea(idea)}
+                  onClick={() => handleOpenIdeaModal(idea)}
                   className="w-full mt-3 md:mt-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm md:text-base py-2 md:py-3"
                 >
                   ✨ Explore Garden
@@ -568,6 +601,9 @@ export default function HomePage() {
           idea={{ ...selectedIdea, bloomUsername: selectedIdea.bloomUsername || "" }}
           onClose={() => setSelectedIdea(null)}
           onProfileClick={(addr) => setSelectedProfile(addr)}
+          links={modalLinks}
+          visuals={modalVisuals}
+          walletAddress={walletAddress} // <-- pass walletAddress
         />
       )}
     </div>

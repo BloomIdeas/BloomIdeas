@@ -34,6 +34,7 @@ export default function UniversalWalletConnection({
   const [showDropdown, setShowDropdown] = useState(false)
   const [showSigningModal, setShowSigningModal] = useState(false)
   const [bloomUsername, setBloomUsername] = useState<string | null>(null)
+  const [pfpEmoji, setPfpEmoji] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
 
@@ -96,6 +97,39 @@ export default function UniversalWalletConnection({
 
     fetchBloomUsername()
   }, [isMounted, isConnected, address, hasVerifiedSignature])
+
+  // Remove Grove-Keeper badge and fetch pfp_emoji for avatar
+  // 1. Add pfpEmoji state
+  // 2. Fetch pfp_emoji from Supabase when fetching bloomUsername
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (isMounted && isConnected && address && hasVerifiedSignature) {
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('bloom_username, pfp_emoji, updated_at')
+            .eq('wallet_address', address)
+            .single()
+
+          if (error && error.code !== 'PGRST116') {
+            console.error('Error fetching user profile:', error)
+          } else if (data) {
+            setBloomUsername(data.bloom_username)
+            setPfpEmoji(data.pfp_emoji)
+          }
+        } catch (err) {
+          console.error('Error fetching user profile:', err)
+        }
+      }
+    }
+    fetchUserProfile()
+  }, [isMounted, isConnected, address, hasVerifiedSignature])
+
+  // 3. Helper to get a random emoji if pfp_emoji is not set
+  const randomEmojis = ["🌱", "🌸", "🌻", "🌼", "🌷", "🍀", "🪴", "🌺", "🌵", "🍃"]
+  function getRandomEmoji() {
+    return randomEmojis[Math.floor(Math.random() * randomEmojis.length)]
+  }
 
   // if connected but no valid signature, prompt sign
   useEffect(() => {
@@ -235,24 +269,35 @@ export default function UniversalWalletConnection({
     }
   }
 
+  // 1. Add a helper for animated emoji avatar
+  function AnimatedEmojiAvatar({ emoji, size = 40, animate = false }: { emoji: string, size?: number, animate?: boolean }) {
+    return (
+      <span
+        className={
+          `inline-flex items-center justify-center rounded-full bg-emerald-100 shadow-md ` +
+          (animate ? 'animate-bounce' : '')
+        }
+        style={{ fontSize: size, width: size, height: size }}
+      >
+        {emoji}
+      </span>
+    )
+  }
+
+  // 2. In the closed state (Button), show pfp emoji, wallet address, and sprouts earned
   return (
     <div className="relative">
       <Button
         variant="outline"
         size={isMobile ? "sm" : "default"}
         onClick={() => setShowDropdown((v) => !v)}
-        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 
-                   bg-white/80 backdrop-blur-sm text-xs md:text-sm"
+        className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm px-2 md:px-4 py-1 md:py-2 flex items-center gap-2 md:gap-3 text-xs md:text-sm min-h-[44px]"
       >
-        <Avatar className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2">
-          <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">
-            {shortAddr.slice(2, 4).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
+        <AnimatedEmojiAvatar emoji={pfpEmoji || getRandomEmoji()} size={isMobile ? 28 : 32} animate={false} />
         <span className="font-medium hidden sm:inline">{shortAddr}</span>
-        <Badge className="ml-1 md:ml-2 bg-emerald-100 text-emerald-700 text-xs">
-          {isMobile ? `${balance} ${symbol}` : `${balance} ${symbol}`}
-        </Badge>
+        <span className="flex items-center gap-1 ml-1 md:ml-2 text-emerald-700 text-xs font-semibold">
+          {sproutsLoading ? '...' : totalSprouts > 0 ? `${totalSprouts}` : '0'} <span className="text-lg">🌱</span>
+        </span>
       </Button>
 
       {showDropdown && (
@@ -266,19 +311,12 @@ export default function UniversalWalletConnection({
           <CardContent className="p-3 md:p-4 space-y-3 md:space-y-4">
             {/* Profile Header */}
             <div className="flex items-center gap-2 md:gap-3 border-b border-emerald-100 pb-2 md:pb-3">
-              <Avatar className="w-10 h-10 md:w-12 md:h-12">
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs md:text-sm">
-                  {shortAddr.slice(2, 4).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <AnimatedEmojiAvatar emoji={pfpEmoji || getRandomEmoji()} size={isMobile ? 48 : 56} animate={true} />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-emerald-900 text-sm md:text-base">
                   {bloomUsername || "Anonymous Gardener"}
                 </p>
                 <p className="text-xs md:text-sm text-emerald-600/70">{shortAddr}</p>
-                <Badge className="bg-teal-400 text-white border-0 mt-1 text-xs">
-                  Grove-Keeper
-                </Badge>
               </div>
             </div>
 

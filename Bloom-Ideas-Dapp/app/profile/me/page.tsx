@@ -31,6 +31,7 @@ import { toast } from "sonner"
 import EmojiPicker from "@/components/emoji-picker"
 import { useSprouts } from "@/hooks/use-sprouts"
 import { getReputationLevel } from "@/lib/sprouts"
+import { useGardenTheme } from '@/components/garden-theme-context';
 
 // Types
 interface UserProfile {
@@ -77,6 +78,21 @@ export default function MyProfilePage() {
   const { hasVerifiedSignature } = useSignatureVerification()
   const { totalSprouts, sproutsByType, loading } = useSprouts(address)
   const reputationLevel = getReputationLevel(totalSprouts)
+  const { gardenTheme } = useGardenTheme();
+  const getThemeHeaderGradient = () => {
+    switch (gardenTheme) {
+      case 'spring':
+        return 'bg-white/80';
+      case 'summer':
+        return 'bg-gradient-to-r from-yellow-50/80 to-orange-100/80';
+      case 'autumn':
+        return 'bg-gradient-to-r from-orange-50/80 to-red-100/80';
+      case 'winter':
+        return 'bg-gradient-to-r from-blue-50/80 to-purple-100/80';
+      default:
+        return 'bg-white/80';
+    }
+  };
 
   // Check if user is authenticated
   const isAuthenticated = isConnected && hasVerifiedSignature && address
@@ -336,7 +352,7 @@ export default function MyProfilePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       {/* Header */}
-      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className={`border-b border-emerald-200/50 ${getThemeHeaderGradient()} backdrop-blur-sm sticky top-0 z-50`}>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

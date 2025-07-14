@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Heart, Users, MessageCircle, Sparkles, TrendingUp } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
 interface SimplifiedIdeaCardProps {
   idea: any
@@ -39,7 +41,9 @@ export default function SimplifiedIdeaCard({ idea, onViewDetails, onProfileClick
             <h3 className="font-bold text-lg text-emerald-900 group-hover:text-emerald-700 transition-colors mb-2 line-clamp-2">
               {idea.title}
             </h3>
-            <p className="text-emerald-800/70 text-sm line-clamp-2 mb-3">{idea.description}</p>
+            <div className="prose prose-emerald text-emerald-800/70 text-sm line-clamp-2 mb-3">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{idea.description}</ReactMarkdown>
+            </div>
           </div>
           <Badge className={`${statusInfo.color} ml-2 flex-shrink-0`}>
             {statusInfo.emoji} {statusInfo.label}

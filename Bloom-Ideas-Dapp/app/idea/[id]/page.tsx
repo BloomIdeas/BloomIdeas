@@ -26,6 +26,10 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { getSproutTypeId } from "@/lib/sprouts"
+import { useGardenTheme } from '@/components/garden-theme-context';
+import { useParams } from "next/navigation"
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const mockIdea = {
   id: 1,
@@ -181,6 +185,8 @@ const mockComments = [
 ]
 
 export default function IdeaDetailPage() {
+  const params = useParams();
+  const projectId = params?.id ? Number(params.id) : null;
   const [hasVoted, setHasVoted] = useState(false)
   const [isInterested, setIsInterested] = useState(false)
   const [newComment, setNewComment] = useState("")
@@ -189,9 +195,29 @@ export default function IdeaDetailPage() {
   const [comments, setComments] = useState<any[]>([])
   const [submittingComment, setSubmittingComment] = useState(false)
   const isMobile = useIsMobile()
+  const { gardenTheme } = useGardenTheme();
+  const [project, setProject] = useState<any>(null);
+  const [projectLinks, setProjectLinks] = useState<any[]>([]);
+  const [projectVisuals, setProjectVisuals] = useState<any[]>([]);
+
+  const getThemeHeaderGradient = () => {
+    switch (gardenTheme) {
+      case 'spring':
+        return 'bg-white/80';
+      case 'summer':
+        return 'bg-gradient-to-r from-yellow-50/80 to-orange-100/80';
+      case 'autumn':
+        return 'bg-gradient-to-r from-orange-50/80 to-red-100/80';
+      case 'winter':
+        return 'bg-gradient-to-r from-blue-50/80 to-purple-100/80';
+      default:
+        return 'bg-white/80';
+    }
+  };
 
   // Load comments for this idea
   useEffect(() => {
+    if (!projectId) return;
     const loadComments = async () => {
       const { data, error } = await supabase
         .from("comments")
@@ -205,7 +231,7 @@ export default function IdeaDetailPage() {
             wallet_address
           )
         `)
-        .eq("project_id", 1) // TODO: Use actual project ID from params
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
       
       if (error) {
@@ -217,7 +243,47 @@ export default function IdeaDetailPage() {
     }
     
     loadComments()
-  }, [])
+  }, [projectId])
+
+  useEffect(() => {
+    if (!projectId) return;
+    const fetchProjectData = async () => {
+      // Fetch project
+      const { data: projectData, error: projectError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", projectId)
+        .single();
+      if (projectError) {
+        console.error("Error loading project:", projectError);
+        return;
+      }
+      setProject(projectData);
+      // Fetch links
+      const { data: linksData, error: linksError } = await supabase
+        .from("project_links")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true });
+      if (linksError) {
+        console.error("Error loading project links:", linksError);
+      } else {
+        setProjectLinks(linksData || []);
+      }
+      // Fetch visuals
+      const { data: visualsData, error: visualsError } = await supabase
+        .from("project_visuals")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true });
+      if (visualsError) {
+        console.error("Error loading project visuals:", visualsError);
+      } else {
+        setProjectVisuals(visualsData || []);
+      }
+    };
+    fetchProjectData();
+  }, [projectId]);
 
   // Handle comment submission
   const handleSubmitComment = async () => {
@@ -237,7 +303,7 @@ export default function IdeaDetailPage() {
       const { data: comment, error: commentErr } = await supabase
         .from("comments")
         .insert({
-          project_id: 1, // TODO: Use actual project ID from params
+          project_id: projectId,
           user_address: walletAddress,
           content: newComment.trim(),
         })
@@ -276,7 +342,7 @@ export default function IdeaDetailPage() {
             wallet_address
           )
         `)
-        .eq("project_id", 1)
+        .eq("project_id", projectId)
         .order("created_at", { ascending: false })
       
       if (!refreshErr) {
@@ -292,10 +358,12 @@ export default function IdeaDetailPage() {
     }
   }
 
+  const ideaData = project || mockIdea;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
       {/* Header */}
-      <header className="border-b border-emerald-200/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className={`border-b border-emerald-200/50 ${getThemeHeaderGradient()} backdrop-blur-sm sticky top-0 z-50`}>
         <div className="container mx-auto px-4 py-3 md:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 md:gap-4">
@@ -328,21 +396,21 @@ export default function IdeaDetailPage() {
               <CardHeader className="pb-3 md:pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-emerald-900 mb-2 md:mb-3">{mockIdea.title}</h1>
+                    <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-emerald-900 mb-2 md:mb-3">{ideaData.title}</h1>
                     <button
-                      onClick={() => setSelectedProfile(mockIdea.author)}
+                      onClick={() => setSelectedProfile(ideaData.author)}
                       className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-emerald-600/70 mb-3 md:mb-4 hover:bg-emerald-50 rounded-lg p-2 transition-colors"
                     >
                       <Avatar className="w-5 h-5 md:w-6 md:h-6">
                         <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">GT</AvatarFallback>
                       </Avatar>
-                      <span className="font-medium">{mockIdea.authorName}</span>
-                      <span className="hidden sm:inline">({mockIdea.author})</span>
+                      <span className="font-medium">{ideaData.authorName}</span>
+                      <span className="hidden sm:inline">({ideaData.author})</span>
                       <span>•</span>
-                      <span>{mockIdea.createdAt}</span>
+                      <span>{ideaData.createdAt}</span>
                     </button>
                     <div className="flex flex-wrap gap-1 md:gap-2">
-                      {mockIdea.tags.map((tag) => (
+                      {ideaData.tags.map((tag: any) => (
                         <Badge key={tag} variant="secondary" className="bg-emerald-100 text-emerald-700 text-xs">
                           {tag}
                         </Badge>
@@ -354,13 +422,13 @@ export default function IdeaDetailPage() {
             </Card>
 
             {/* Development Status */}
-            {mockIdea.inDevelopment && (
+            {ideaData.inDevelopment && (
               <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
                 <CardContent className="p-3 md:p-4">
                   <div className="flex items-center gap-2 md:gap-3">
                     <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse"></div>
                     <span className="font-medium text-green-800 text-sm md:text-base">🌱 Currently Growing</span>
-                    <Link href={mockIdea.githubRepo} className="ml-auto">
+                    <Link href={ideaData.githubRepo} className="ml-auto">
                       <Button
                         size="sm"
                         variant="outline"
@@ -381,13 +449,60 @@ export default function IdeaDetailPage() {
                 <h2 className="text-lg md:text-xl font-semibold text-emerald-900">About This Idea</h2>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-emerald max-w-none">
-                  {mockIdea.description.split("\n").map((paragraph, index) => (
-                    <p key={index} className="text-emerald-800/90 mb-3 md:mb-4 last:mb-0 text-sm md:text-base">
-                      {paragraph}
-                    </p>
-                  ))}
+                {/* Visuals Grid */}
+                {projectVisuals.length > 0 && (
+                  <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {projectVisuals.map((visual: any) => (
+                      <div key={visual.id} className="rounded-lg overflow-hidden border border-emerald-100 bg-emerald-50 flex flex-col items-center justify-center">
+                        <img
+                          src={visual.url}
+                          alt={visual.alt_text || "Project visual"}
+                          className="object-cover w-full h-40 sm:h-48 md:h-56"
+                          style={{ maxHeight: 220 }}
+                        />
+                        {visual.alt_text && (
+                          <div className="p-2 text-xs text-emerald-700 text-center bg-emerald-50 w-full">{visual.alt_text}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Markdown Description */}
+                <div className="prose prose-emerald max-w-none mb-4">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{ideaData.description}</ReactMarkdown>
                 </div>
+                {/* Project Links */}
+                {projectLinks.length > 0 && (
+                  <div className="mt-2">
+                    <h3 className="font-semibold text-emerald-800 text-sm mb-2">Project Links</h3>
+                    <ul className="space-y-2">
+                      {projectLinks.map((link: any) => {
+                        let urlObj;
+                        try { urlObj = new URL(link.url); } catch { urlObj = null; }
+                        const domain = urlObj ? urlObj.hostname.replace(/^www\./, "") : link.url;
+                        return (
+                          <li key={link.id} className="flex items-center gap-3 p-2 bg-emerald-50 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors">
+                            <img
+                              src={`https://www.google.com/s2/favicons?domain=${urlObj ? urlObj.hostname : link.url}&sz=32`}
+                              alt="favicon"
+                              className="w-5 h-5 rounded"
+                              style={{ minWidth: 20 }}
+                            />
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-700 font-medium hover:underline"
+                            >
+                              {link.label || domain}
+                            </a>
+                            <span className="ml-auto text-xs text-emerald-400">{domain}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -402,13 +517,13 @@ export default function IdeaDetailPage() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="font-medium text-emerald-800 text-sm md:text-base">Community Funding</span>
                     <span className="text-xs md:text-sm text-emerald-600">
-                      ${mockIdea.funding.raised.toLocaleString()} / ${mockIdea.funding.target.toLocaleString()}
+                      ${ideaData.funding.raised.toLocaleString()} / ${ideaData.funding.target.toLocaleString()}
                     </span>
                   </div>
-                  <Progress value={(mockIdea.funding.raised / mockIdea.funding.target) * 100} className="h-2 md:h-3 mb-2" />
+                  <Progress value={(ideaData.funding.raised / ideaData.funding.target) * 100} className="h-2 md:h-3 mb-2" />
                   <div className="flex justify-between text-xs md:text-sm text-emerald-600/70">
-                    <span>{mockIdea.funding.backers} backers</span>
-                    <span>{Math.round((mockIdea.funding.raised / mockIdea.funding.target) * 100)}% funded</span>
+                    <span>{ideaData.funding.backers} backers</span>
+                    <span>{Math.round((ideaData.funding.raised / ideaData.funding.target) * 100)}% funded</span>
                   </div>
                 </div>
 
@@ -416,7 +531,7 @@ export default function IdeaDetailPage() {
                 <div>
                   <h3 className="font-medium text-emerald-800 mb-2 md:mb-3 text-sm md:text-base">Supported Chains</h3>
                   <div className="flex flex-wrap gap-1 md:gap-2">
-                    {mockIdea.chains.map((chain) => (
+                    {ideaData.chains.map((chain: any) => (
                       <Badge key={chain} variant="outline" className="border-blue-200 text-blue-700 text-xs">
                         {chain}
                       </Badge>
@@ -428,7 +543,7 @@ export default function IdeaDetailPage() {
                 <div>
                   <h3 className="font-medium text-emerald-800 mb-2 md:mb-3 text-sm md:text-base">Development Milestones</h3>
                   <div className="space-y-2 md:space-y-3">
-                    {mockIdea.milestones.map((milestone, index) => (
+                    {ideaData.milestones.map((milestone: any, index: any) => (
                       <div key={index} className="flex items-center gap-2 md:gap-3">
                         <div
                           className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${
@@ -488,9 +603,60 @@ export default function IdeaDetailPage() {
                 <h2 className="text-lg md:text-xl font-semibold text-emerald-900">📖 Detailed Overview</h2>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-emerald max-w-none">
-                  <div className="whitespace-pre-wrap text-emerald-800/90 text-sm md:text-base">{mockIdea.fullDescription}</div>
+                {/* Visuals Grid */}
+                {projectVisuals.length > 0 && (
+                  <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {projectVisuals.map((visual: any) => (
+                      <div key={visual.id} className="rounded-lg overflow-hidden border border-emerald-100 bg-emerald-50 flex flex-col items-center justify-center">
+                        <img
+                          src={visual.url}
+                          alt={visual.alt_text || "Project visual"}
+                          className="object-cover w-full h-40 sm:h-48 md:h-56"
+                          style={{ maxHeight: 220 }}
+                        />
+                        {visual.alt_text && (
+                          <div className="p-2 text-xs text-emerald-700 text-center bg-emerald-50 w-full">{visual.alt_text}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Markdown Full Description */}
+                <div className="prose prose-emerald max-w-none mb-4">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{ideaData.fullDescription}</ReactMarkdown>
                 </div>
+                {/* Project Links */}
+                {projectLinks.length > 0 && (
+                  <div className="mt-2">
+                    <h3 className="font-semibold text-emerald-800 text-sm mb-2">Project Links</h3>
+                    <ul className="space-y-2">
+                      {projectLinks.map((link: any) => {
+                        let urlObj;
+                        try { urlObj = new URL(link.url); } catch { urlObj = null; }
+                        const domain = urlObj ? urlObj.hostname.replace(/^www\./, "") : link.url;
+                        return (
+                          <li key={link.id} className="flex items-center gap-3 p-2 bg-emerald-50 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors">
+                            <img
+                              src={`https://www.google.com/s2/favicons?domain=${urlObj ? urlObj.hostname : link.url}&sz=32`}
+                              alt="favicon"
+                              className="w-5 h-5 rounded"
+                              style={{ minWidth: 20 }}
+                            />
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-emerald-700 font-medium hover:underline"
+                            >
+                              {link.label || domain}
+                            </a>
+                            <span className="ml-auto text-xs text-emerald-400">{domain}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -501,7 +667,7 @@ export default function IdeaDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-1 md:gap-2">
-                  {mockIdea.techStack.map((tech) => (
+                  {ideaData.techStack.map((tech: any) => (
                     <Badge key={tech} variant="outline" className="border-emerald-200 text-emerald-700 text-xs">
                       {tech}
                     </Badge>
@@ -608,14 +774,14 @@ export default function IdeaDetailPage() {
                     <Heart className="w-3 h-3 md:w-4 md:h-4 text-rose-500" />
                     <span className="text-xs md:text-sm">Community Love</span>
                   </div>
-                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockIdea.votes}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{ideaData.votes}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1 md:gap-2 text-emerald-700">
                     <Users className="w-3 h-3 md:w-4 md:h-4 text-blue-500" />
                     <span className="text-xs md:text-sm">Builders Interested</span>
                   </div>
-                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockIdea.interested}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{ideaData.interested}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1 md:gap-2 text-emerald-700">
@@ -629,14 +795,14 @@ export default function IdeaDetailPage() {
                     <Zap className="w-3 h-3 md:w-4 md:h-4 text-yellow-500" />
                     <span className="text-xs md:text-sm">Hot Score</span>
                   </div>
-                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockIdea.hotScore}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{ideaData.hotScore}</span>
                 </div>
                 <div className="pt-2 md:pt-3 border-t border-emerald-100">
                   <div className="flex justify-between text-xs md:text-sm text-emerald-600/70 mb-1 md:mb-2">
                     <span>Growth Progress</span>
-                    <span>{mockIdea.developmentProgress}%</span>
+                    <span>{ideaData.developmentProgress}%</span>
                   </div>
-                  <Progress value={mockIdea.developmentProgress} className="h-1.5 md:h-2" />
+                  <Progress value={ideaData.developmentProgress} className="h-1.5 md:h-2" />
                 </div>
               </CardContent>
             </Card>
