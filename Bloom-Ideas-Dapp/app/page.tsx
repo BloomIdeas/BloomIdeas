@@ -240,6 +240,18 @@ export default function HomePage() {
         return
       }
     } else {
+      // --- FIX: If switching from nurture to neglect, delete the sprout first ---
+      if (existing === "nurture" && action === "neglect") {
+        const nurtureTypeId = await getSproutTypeId('nurture')
+        await supabase
+          .from("sprouts")
+          .delete()
+          .match({
+            user_address: walletAddress,
+            sprout_type_id: nurtureTypeId,
+            related_id: projId,
+          })
+      }
       // upsert - adding/updating care action
       await supabase
         .from("project_care_actions")

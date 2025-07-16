@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Copy, ExternalLink, LogOut, User } from "lucide-react"
 import { toast } from "sonner"
-import { useAccount, useBalance, useChainId, useDisconnect } from 'wagmi'
+import { useAccount, useBalance, useChainId, useDisconnect, useEnsName, useEnsAvatar } from 'wagmi'
+import { getAddress } from 'viem'
 import { useConnectModal } from '@rainbow-me/rainbowkit'
 import { formatUnits } from 'viem'
 import { mainnet, sepolia, polygon } from 'viem/chains'
@@ -27,6 +28,28 @@ export default function UniversalWalletConnection({
 }: UniversalWalletConnectionProps) {
   const [isMounted, setIsMounted] = useState(false)
   const { address, isConnected } = useAccount()
+  const {
+    hasVerifiedSignature,
+    signature,
+    isLoading: signatureLoading,
+    verifySignature,
+    clearSignature,
+  } = useSignatureVerification()
+  // Always use checksummed address for ENS
+  const checksummedAddress = address ? getAddress(address) : undefined;
+  const ensNameResult = useEnsName({ address: checksummedAddress, chainId: 1 });
+  const ensName = hasVerifiedSignature ? (ensNameResult.data ?? undefined) : undefined;
+  const ensAvatarResult = useEnsAvatar({ name: ensName, chainId: 1 });
+  const ensAvatar = hasVerifiedSignature ? (ensAvatarResult.data ?? undefined) : undefined;
+  // Debug logs
+  console.log('ENS debug:', {
+    address,
+    checksummedAddress,
+    ensNameResult,
+    ensName,
+    ensAvatarResult,
+    ensAvatar,
+  });
   const chainId = useChainId()
   const { disconnect } = useDisconnect()
   const { openConnectModal } = useConnectModal()
@@ -37,14 +60,6 @@ export default function UniversalWalletConnection({
   const [pfpEmoji, setPfpEmoji] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
-
-  const {
-    hasVerifiedSignature,
-    signature,
-    isLoading: signatureLoading,
-    verifySignature,
-    clearSignature,
-  } = useSignatureVerification()
 
   const {
     totalSprouts,
@@ -284,7 +299,19 @@ export default function UniversalWalletConnection({
     )
   }
 
-  // 2. In the closed state (Button), show pfp emoji, wallet address, and sprouts earned
+  // 1a. Helper for ENS avatar
+  function EnsAvatar({ src, size = 40 }: { src: string, size?: number }) {
+    return (
+      <img
+        src={src}
+        alt="ENS Avatar"
+        style={{ width: size, height: size, borderRadius: '9999px', background: '#f0fdf4' }}
+        className="shadow-md"
+      />
+    )
+  }
+
+  // 2. In the closed state (Button), show ENS avatar if available, else pfp emoji, wallet address or ENS name, and sprouts earned
   return (
     <div className="relative">
       <Button
@@ -293,11 +320,17 @@ export default function UniversalWalletConnection({
         onClick={() => setShowDropdown((v) => !v)}
         className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-white/80 backdrop-blur-sm px-2 md:px-4 py-1 md:py-2 flex items-center gap-2 md:gap-3 text-xs md:text-sm min-h-[44px]"
       >
-        <AnimatedEmojiAvatar emoji={pfpEmoji || getRandomEmoji()} size={isMobile ? 28 : 32} animate={false} />
-        <span className="font-medium hidden sm:inline">{shortAddr}</span>
+        {ensAvatar ? (
+          <EnsAvatar src={ensAvatar} size={isMobile ? 28 : 32} />
+        ) : (
+          <AnimatedEmojiAvatar emoji={pfpEmoji || getRandomEmoji()} size={isMobile ? 28 : 32} animate={false} />
+        )}
+        <span className="font-medium hidden sm:inline">{ensName ? ensName : shortAddr}</span>
         <span className="flex items-center gap-1 ml-1 md:ml-2 text-emerald-700 text-xs font-semibold">
           {sproutsLoading ? '...' : totalSprouts > 0 ? `${totalSprouts}` : '0'} <span className="text-lg">🌱</span>
         </span>
+        {/* ENS Refetch for debug */}
+        <button type="button" onClick={() => { ensNameResult.refetch(); ensAvatarResult.refetch(); }} className="ml-2 text-xs text-emerald-500 underline">ENS Refetch</button>
       </Button>
 
       {showDropdown && (
@@ -311,12 +344,16 @@ export default function UniversalWalletConnection({
           <CardContent className="p-3 md:p-4 space-y-3 md:space-y-4">
             {/* Profile Header */}
             <div className="flex items-center gap-2 md:gap-3 border-b border-emerald-100 pb-2 md:pb-3">
-              <AnimatedEmojiAvatar emoji={pfpEmoji || getRandomEmoji()} size={isMobile ? 48 : 56} animate={true} />
+              {ensAvatar ? (
+                <EnsAvatar src={ensAvatar} size={isMobile ? 48 : 56} />
+              ) : (
+                <AnimatedEmojiAvatar emoji={pfpEmoji || getRandomEmoji()} size={isMobile ? 48 : 56} animate={true} />
+              )}
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-emerald-900 text-sm md:text-base">
-                  {bloomUsername || "Anonymous Gardener"}
+                  {ensName ? ensName : bloomUsername || "Anonymous Gardener"}
                 </p>
-                <p className="text-xs md:text-sm text-emerald-600/70">{shortAddr}</p>
+                <p className="text-xs md:text-sm text-emerald-600/70">{ensName ? shortAddr : shortAddr}</p>
               </div>
             </div>
 
