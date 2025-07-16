@@ -18,6 +18,7 @@ import { useSignatureVerification } from '@/hooks/use-signature-verification'
 import { supabase } from '@/lib/supabaseClient'  // your initialized client
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSprouts } from "@/hooks/use-sprouts"
+import { JsonRpcProvider } from 'ethers/providers'
 
 interface UniversalWalletConnectionProps {
   onConnectionChange?: (isConnected: boolean, address?: string) => void
@@ -41,14 +42,38 @@ export default function UniversalWalletConnection({
   const ensName = hasVerifiedSignature ? (ensNameResult.data ?? undefined) : undefined;
   const ensAvatarResult = useEnsAvatar({ name: ensName, chainId: 1 });
   const ensAvatar = hasVerifiedSignature ? (ensAvatarResult.data ?? undefined) : undefined;
+  // Debug ENS lookup for vitalik.eth's address
+  const vitalikAddress = '0xcB034160f7B45E41E6015ECEA09F31A66C144422';
+  const vitalikEnsNameResult = useEnsName({ address: vitalikAddress, chainId: 1 });
+  const vitalikEnsName = vitalikEnsNameResult.data ?? undefined;
   // Debug logs
   console.log('ENS debug:', {
     address,
     checksummedAddress,
-    ensNameResult,
+    ensNameResult: {
+      ...ensNameResult,
+      data: ensNameResult.data,
+      error: ensNameResult.error,
+      status: ensNameResult.status,
+      fetchStatus: ensNameResult.fetchStatus,
+      isPending: ensNameResult.isPending,
+      isSuccess: ensNameResult.isSuccess,
+      isError: ensNameResult.isError,
+    },
     ensName,
     ensAvatarResult,
     ensAvatar,
+    vitalikEnsNameResult: {
+      ...vitalikEnsNameResult,
+      data: vitalikEnsNameResult.data,
+      error: vitalikEnsNameResult.error,
+      status: vitalikEnsNameResult.status,
+      fetchStatus: vitalikEnsNameResult.fetchStatus,
+      isPending: vitalikEnsNameResult.isPending,
+      isSuccess: vitalikEnsNameResult.isSuccess,
+      isError: vitalikEnsNameResult.isError,
+    },
+    vitalikEnsName,
   });
   const chainId = useChainId()
   const { disconnect } = useDisconnect()
@@ -60,6 +85,7 @@ export default function UniversalWalletConnection({
   const [pfpEmoji, setPfpEmoji] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
+  const [ethersEnsName, setEthersEnsName] = useState<string | null>(null);
 
   const {
     totalSprouts,
@@ -232,6 +258,28 @@ export default function UniversalWalletConnection({
     toast('Disconnected')
   }
 
+  // Ethers.js direct ENS lookup for debug
+  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_ALCHEMY_MAINNET_RPC);
+  useEffect(() => {
+    async function fetchEnsNames() {
+      console.log('Ethers.js ENS debug: address in effect:', address);
+      if (address) {
+        try {
+          const userEns = await provider.lookupAddress(address);
+          setEthersEnsName(userEns);
+          console.log('Ethers.js ENS for user:', address, userEns);
+        } catch (e) {
+          setEthersEnsName(null);
+          console.error('Ethers.js ENS error for user:', address, e);
+        }
+      } else {
+        setEthersEnsName(null);
+      }
+    
+    }
+    fetchEnsNames();
+  }, [address]);
+
   if (!isMounted) return null
 
   if (!isConnected) {
@@ -325,12 +373,10 @@ export default function UniversalWalletConnection({
         ) : (
           <AnimatedEmojiAvatar emoji={pfpEmoji || getRandomEmoji()} size={isMobile ? 28 : 32} animate={false} />
         )}
-        <span className="font-medium hidden sm:inline">{ensName ? ensName : shortAddr}</span>
+        <span className="font-medium hidden sm:inline">{ethersEnsName || ensName || shortAddr}</span>
         <span className="flex items-center gap-1 ml-1 md:ml-2 text-emerald-700 text-xs font-semibold">
           {sproutsLoading ? '...' : totalSprouts > 0 ? `${totalSprouts}` : '0'} <span className="text-lg">🌱</span>
         </span>
-        {/* ENS Refetch for debug */}
-        <button type="button" onClick={() => { ensNameResult.refetch(); ensAvatarResult.refetch(); }} className="ml-2 text-xs text-emerald-500 underline">ENS Refetch</button>
       </Button>
 
       {showDropdown && (
@@ -351,9 +397,9 @@ export default function UniversalWalletConnection({
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-emerald-900 text-sm md:text-base">
-                  {ensName ? ensName : bloomUsername || "Anonymous Gardener"}
+                  {ethersEnsName || ensName || bloomUsername || "Anonymous Gardener"}
                 </p>
-                <p className="text-xs md:text-sm text-emerald-600/70">{ensName ? shortAddr : shortAddr}</p>
+                <p className="text-xs md:text-sm text-emerald-600/70">{ethersEnsName || ensName || shortAddr}</p>
               </div>
             </div>
 
