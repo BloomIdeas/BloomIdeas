@@ -15,7 +15,7 @@ import { formatUnits } from 'viem'
 import { mainnet, sepolia, polygon } from 'viem/chains'
 import MessageSigningModal from './message-signing-modal'
 import { useSignatureVerification } from '@/hooks/use-signature-verification'
-import { supabase } from '@/lib/supabaseClient'  // your initialized client
+import { supabase } from '@/lib/supabaseClient'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSprouts } from "@/hooks/use-sprouts"
 import { JsonRpcProvider } from 'ethers/providers'
@@ -36,45 +36,11 @@ export default function UniversalWalletConnection({
     verifySignature,
     clearSignature,
   } = useSignatureVerification()
-  // Always use checksummed address for ENS
-  const checksummedAddress = address ? getAddress(address) : undefined;
-  const ensNameResult = useEnsName({ address: checksummedAddress, chainId: 1 });
-  const ensName = hasVerifiedSignature ? (ensNameResult.data ?? undefined) : undefined;
-  const ensAvatarResult = useEnsAvatar({ name: ensName, chainId: 1 });
-  const ensAvatar = hasVerifiedSignature ? (ensAvatarResult.data ?? undefined) : undefined;
-  // Debug ENS lookup for vitalik.eth's address
-  const vitalikAddress = '0xcB034160f7B45E41E6015ECEA09F31A66C144422';
-  const vitalikEnsNameResult = useEnsName({ address: vitalikAddress, chainId: 1 });
-  const vitalikEnsName = vitalikEnsNameResult.data ?? undefined;
-  // Debug logs
-  console.log('ENS debug:', {
-    address,
-    checksummedAddress,
-    ensNameResult: {
-      ...ensNameResult,
-      data: ensNameResult.data,
-      error: ensNameResult.error,
-      status: ensNameResult.status,
-      fetchStatus: ensNameResult.fetchStatus,
-      isPending: ensNameResult.isPending,
-      isSuccess: ensNameResult.isSuccess,
-      isError: ensNameResult.isError,
-    },
-    ensName,
-    ensAvatarResult,
-    ensAvatar,
-    vitalikEnsNameResult: {
-      ...vitalikEnsNameResult,
-      data: vitalikEnsNameResult.data,
-      error: vitalikEnsNameResult.error,
-      status: vitalikEnsNameResult.status,
-      fetchStatus: vitalikEnsNameResult.fetchStatus,
-      isPending: vitalikEnsNameResult.isPending,
-      isSuccess: vitalikEnsNameResult.isSuccess,
-      isError: vitalikEnsNameResult.isError,
-    },
-    vitalikEnsName,
-  });
+  const checksummedAddress = address ? getAddress(address) : undefined
+  const ensNameResult = useEnsName({ address: checksummedAddress, chainId: 1 })
+  const ensName = hasVerifiedSignature ? (ensNameResult.data ?? undefined) : undefined
+  const ensAvatarResult = useEnsAvatar({ name: ensName, chainId: 1 })
+  const ensAvatar = hasVerifiedSignature ? (ensAvatarResult.data ?? undefined) : undefined
   const chainId = useChainId()
   const { disconnect } = useDisconnect()
   const { openConnectModal } = useConnectModal()
@@ -83,96 +49,85 @@ export default function UniversalWalletConnection({
   const [showSigningModal, setShowSigningModal] = useState(false)
   const [bloomUsername, setBloomUsername] = useState<string | null>(null)
   const [pfpEmoji, setPfpEmoji] = useState<string | null>(null)
+  const [ethersEnsName, setEthersEnsName] = useState<string | null>(null)
+  const [ensError, setEnsError] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isMobile = useIsMobile()
-  const [ethersEnsName, setEthersEnsName] = useState<string | null>(null);
 
-  const {
-    totalSprouts,
-    loading: sproutsLoading,
-  } = useSprouts(address ?? null)
+  const { totalSprouts, loading: sproutsLoading } = useSprouts(address ?? null)
 
-  // ensure we only run in browser
+  // Set mounted state
+  useEffect(() => { setIsMounted(true) }, [])
+
+  // Close dropdown on outside click
   useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  // Handle clicking outside dropdown to close it
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowDropdown(false)
       }
     }
-
     if (showDropdown) {
       document.addEventListener('mousedown', handleClickOutside)
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showDropdown])
 
-  // Fetch user's bloom_username when connected and authenticated
+  // Fetch bloom username and emoji from Supabase
   useEffect(() => {
-    const fetchBloomUsername = async () => {
+    async function fetchUserProfile() {
       if (isMounted && isConnected && address && hasVerifiedSignature) {
         try {
           const { data, error } = await supabase
             .from('users')
-            .select('bloom_username')
+            .select('bloom_username, pfp_emoji')
             .eq('wallet_address', address)
             .single()
-
           if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching bloom_username:', error)
-          } else if (data) {
-            setBloomUsername(data.bloom_username)
+            // Ignore not found error
+            throw error
           }
-        } catch (err) {
-          console.error('Error fetching bloom_username:', err)
-        }
-      }
-    }
-
-    fetchBloomUsername()
-  }, [isMounted, isConnected, address, hasVerifiedSignature])
-
-  // Remove Grove-Keeper badge and fetch pfp_emoji for avatar
-  // 1. Add pfpEmoji state
-  // 2. Fetch pfp_emoji from Supabase when fetching bloomUsername
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (isMounted && isConnected && address && hasVerifiedSignature) {
-        try {
-          const { data, error } = await supabase
-            .from('users')
-            .select('bloom_username, pfp_emoji, updated_at')
-            .eq('wallet_address', address)
-            .single()
-
-          if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching user profile:', error)
-          } else if (data) {
+          if (data) {
             setBloomUsername(data.bloom_username)
             setPfpEmoji(data.pfp_emoji)
           }
         } catch (err) {
-          console.error('Error fetching user profile:', err)
+          // Silent fail for profile
         }
       }
     }
     fetchUserProfile()
   }, [isMounted, isConnected, address, hasVerifiedSignature])
 
-  // 3. Helper to get a random emoji if pfp_emoji is not set
-  const randomEmojis = ["🌱", "🌸", "🌻", "🌼", "🌷", "🍀", "🪴", "🌺", "🌵", "🍃"]
-  function getRandomEmoji() {
-    return randomEmojis[Math.floor(Math.random() * randomEmojis.length)]
-  }
+  // Ethers.js ENS lookup with error handling
+  useEffect(() => {
+    const providerUrl = process.env.NEXT_PUBLIC_ALCHEMY_MAINNET_RPC
+    if (!providerUrl) {
+      setEnsError('ENS lookup unavailable: missing Alchemy RPC URL.')
+      setEthersEnsName(null)
+      return
+    }
+    const provider = new JsonRpcProvider(providerUrl)
+    async function fetchEns() {
+      if (!address) {
+        setEthersEnsName(null)
+        setEnsError(null)
+        return
+      }
+      try {
+        const name = await provider.lookupAddress(address)
+        setEthersEnsName(name)
+        setEnsError(null)
+      } catch (err: any) {
+        setEthersEnsName(null)
+        setEnsError('Unable to resolve ENS name for this address.')
+      }
+    }
+    fetchEns()
+  }, [address])
 
-  // if connected but no valid signature, prompt sign
+  // Prompt for signature if needed
   useEffect(() => {
     if (
       isMounted &&
@@ -185,27 +140,24 @@ export default function UniversalWalletConnection({
     }
   }, [isMounted, isConnected, address, signatureLoading, hasVerifiedSignature])
 
-  // propagate connection+auth upward
+  // Propagate connection+auth upward
   useEffect(() => {
     onConnectionChange?.(isConnected && hasVerifiedSignature, address)
   }, [isConnected, hasVerifiedSignature, address, onConnectionChange])
 
-  // upsert user record in Supabase
+  // Upsert user record in Supabase
   const upsertUserSignature = async (
     wallet: string,
     sig: string
   ): Promise<void> => {
     try {
-      // 1. Check existing
       const { data: existing, error: selErr } = await supabase
         .from('users')
         .select('signature_count')
         .eq('wallet_address', wallet)
         .single()
       if (selErr && selErr.code !== 'PGRST116') throw selErr
-
       if (existing) {
-        // 2a. Update signature & increment count
         const { error: updErr } = await supabase
           .from('users')
           .update({
@@ -216,7 +168,6 @@ export default function UniversalWalletConnection({
           .eq('wallet_address', wallet)
         if (updErr) throw updErr
       } else {
-        // 2b. Insert new user with initial count=1
         const { error: insErr } = await supabase
           .from('users')
           .insert({
@@ -226,21 +177,16 @@ export default function UniversalWalletConnection({
           })
         if (insErr) throw insErr
       }
-
       toast.success('Wallet authenticated')
     } catch (err) {
-      console.error('Upsert user error:', err)
       toast.error('Failed to record login')
     }
   }
 
   const handleSignSuccess = (sig: string) => {
     if (!address) return
-    // 1. Verify on-chain signature
     verifySignature(sig)
-    // 2. Persist into Supabase
     upsertUserSignature(address, sig)
-    // 3. Close modal
     setShowSigningModal(false)
   }
 
@@ -257,28 +203,6 @@ export default function UniversalWalletConnection({
     disconnect()
     toast('Disconnected')
   }
-
-  // Ethers.js direct ENS lookup for debug
-  const provider = new JsonRpcProvider(process.env.NEXT_PUBLIC_ALCHEMY_MAINNET_RPC);
-  useEffect(() => {
-    async function fetchEnsNames() {
-      console.log('Ethers.js ENS debug: address in effect:', address);
-      if (address) {
-        try {
-          const userEns = await provider.lookupAddress(address);
-          setEthersEnsName(userEns);
-          console.log('Ethers.js ENS for user:', address, userEns);
-        } catch (e) {
-          setEthersEnsName(null);
-          console.error('Ethers.js ENS error for user:', address, e);
-        }
-      } else {
-        setEthersEnsName(null);
-      }
-    
-    }
-    fetchEnsNames();
-  }, [address]);
 
   if (!isMounted) return null
 
@@ -332,7 +256,12 @@ export default function UniversalWalletConnection({
     }
   }
 
-  // 1. Add a helper for animated emoji avatar
+  // Helper to get a random emoji if pfp_emoji is not set
+  function getRandomEmoji() {
+    const randomEmojis = ["🌱", "🌸", "🌻", "🌼", "🌷", "🍀", "🪴", "🌺", "🌵", "🍃"];
+    return randomEmojis[Math.floor(Math.random() * randomEmojis.length)];
+  }
+
   function AnimatedEmojiAvatar({ emoji, size = 40, animate = false }: { emoji: string, size?: number, animate?: boolean }) {
     return (
       <span
@@ -347,7 +276,6 @@ export default function UniversalWalletConnection({
     )
   }
 
-  // 1a. Helper for ENS avatar
   function EnsAvatar({ src, size = 40 }: { src: string, size?: number }) {
     return (
       <img
@@ -359,7 +287,6 @@ export default function UniversalWalletConnection({
     )
   }
 
-  // 2. In the closed state (Button), show ENS avatar if available, else pfp emoji, wallet address or ENS name, and sprouts earned
   return (
     <div className="relative">
       <Button
@@ -388,7 +315,6 @@ export default function UniversalWalletConnection({
                      }`}
         >
           <CardContent className="p-3 md:p-4 space-y-3 md:space-y-4">
-            {/* Profile Header */}
             <div className="flex items-center gap-2 md:gap-3 border-b border-emerald-100 pb-2 md:pb-3">
               {ensAvatar ? (
                 <EnsAvatar src={ensAvatar} size={isMobile ? 48 : 56} />
@@ -400,10 +326,11 @@ export default function UniversalWalletConnection({
                   {ethersEnsName || ensName || bloomUsername || "Anonymous Gardener"}
                 </p>
                 <p className="text-xs md:text-sm text-emerald-600/70">{ethersEnsName || ensName || shortAddr}</p>
+                {ensError && (
+                  <span className="text-xs text-red-500">{ensError}</span>
+                )}
               </div>
             </div>
-
-            {/* Wallet & Access Info */}
             <div className="space-y-2">
               <div className="flex justify-between text-emerald-700 text-xs md:text-sm">
                 <span>Balance</span>
@@ -436,8 +363,6 @@ export default function UniversalWalletConnection({
                 </div>
               )}
             </div>
-
-            {/* Actions */}
             <div className="space-y-1 md:space-y-2 border-t border-emerald-100 pt-2">
               <Link href="/profile/me">
                 <Button
@@ -450,7 +375,6 @@ export default function UniversalWalletConnection({
                   View Profile
                 </Button>
               </Link>
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -460,7 +384,6 @@ export default function UniversalWalletConnection({
                 <Copy className="w-3 h-3 md:w-4 md:h-4 mr-2" />
                 Copy Address
               </Button>
-
               {explorerUrl && (
                 <Button
                   variant="ghost"
@@ -478,7 +401,6 @@ export default function UniversalWalletConnection({
                   </a>
                 </Button>
               )}
-
               <Button
                 variant="ghost"
                 size="sm"
@@ -495,3 +417,4 @@ export default function UniversalWalletConnection({
     </div>
   )
 }
+
