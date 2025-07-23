@@ -43,6 +43,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { useRef } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
+import { useCallback } from "react"
 
 interface EnhancedIdeaModalProps {
   idea: {
@@ -121,6 +122,17 @@ export default function EnhancedIdeaModal({
   console.log('totalSprouts:', totalSprouts)
   const [userCommentCount, setUserCommentCount] = useState(0)
   const modalRef = useRef<HTMLDivElement>(null)
+  const [joinRequests, setJoinRequests] = useState<any[]>([])
+  const [joinRequestsLoading, setJoinRequestsLoading] = useState(false)
+  const [userJoinRequest, setUserJoinRequest] = useState<any>(null)
+  const [joinRequestStatus, setJoinRequestStatus] = useState<string>("")
+  const [joinRequestSubmitting, setJoinRequestSubmitting] = useState(false)
+  // Join request form fields
+  const [joinMotivation, setJoinMotivation] = useState("")
+  const [joinSkills, setJoinSkills] = useState("")
+  const [joinExperience, setJoinExperience] = useState("")
+  const [joinLinks, setJoinLinks] = useState("")
+  const [teamTabRefresh, setTeamTabRefresh] = useState(0)
 
   // Helper: get required sprouts for next comment
   function getRequiredSprouts(count: number) {
@@ -129,6 +141,129 @@ export default function EnhancedIdeaModal({
     return 3
   }
   const requiredSprouts = getRequiredSprouts(userCommentCount)
+
+  // Helper: is owner
+  const isOwner = walletAddress && (walletAddress.toLowerCase() === (idea.owner_address || "").toLowerCase())
+
+  // Fetch join requests (for owner)
+  const fetchJoinRequests = useCallback(async () => {
+    setJoinRequestsLoading(true)
+    const { data, error } = await supabase
+      .from("join_requests")
+      .select(`id, builder_address, questions, status, created_at, assigned_at, users:builder_address (bloom_username, wallet_address)`)
+      .eq("project_id", idea.id)
+      .order("created_at", { ascending: true })
+    if (!error) setJoinRequests(data || [])
+    setJoinRequestsLoading(false)
+  }, [idea.id])
+
+  // Fetch current user's join request (for non-owner)
+  const fetchUserJoinRequest = useCallback(async () => {
+    if (!walletAddress) return
+    const { data, error } = await supabase
+      .from("join_requests")
+      .select("id, status, questions, created_at")
+      .eq("project_id", idea.id)
+      .eq("builder_address", walletAddress)
+      .single()
+    if (!error && data) {
+      setUserJoinRequest(data)
+      setJoinRequestStatus(data.status)
+    } else {
+      setUserJoinRequest(null)
+      setJoinRequestStatus("")
+    }
+  }, [idea.id, walletAddress])
+
+  // Fetch on team tab open
+  useEffect(() => {
+    if (activeTab === "team") {
+      if (isOwner) fetchJoinRequests()
+      else fetchUserJoinRequest()
+    }
+    // eslint-disable-next-line
+  }, [activeTab, teamTabRefresh, isOwner, fetchJoinRequests, fetchUserJoinRequest])
+
+  // Submit join request (non-owner)
+  const handleJoinRequest = async () => {
+    if (!walletAddress) {
+      toast.error("Connect your wallet first")
+      return
+    }
+    if (!joinMotivation.trim() || !joinSkills.trim()) {
+      toast.error("Please fill in all required fields.")
+      return
+    }
+    setJoinRequestSubmitting(true)
+    try {
+      const questions = {
+        motivation: joinMotivation.trim(),
+        skills: joinSkills.trim(),
+        experience: joinExperience.trim(),
+        links: joinLinks.trim(),
+      }
+      const { error } = await supabase
+        .from("join_requests")
+        .insert({
+          project_id: idea.id,
+          builder_address: walletAddress,
+          questions,
+        })
+      if (error) {
+        if (error.code === '23505') {
+          toast.error("You have already requested to join.")
+        } else {
+          toast.error(error.message || "Failed to submit join request")
+        }
+      } else {
+        toast.success("Join request submitted!")
+        setTeamTabRefresh(r => r + 1)
+        setJoinMotivation("")
+        setJoinSkills("")
+        setJoinExperience("")
+        setJoinLinks("")
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to submit join request")
+    } finally {
+      setJoinRequestSubmitting(false)
+    }
+  }
+
+  // Owner: accept/decline join request
+  const handleRequestAction = async (requestId: number, action: 'accept' | 'decline') => {
+    if (!isOwner) return
+    try {
+      // Update join_requests status
+      const { error: reqError, data: reqData } = await supabase
+        .from("join_requests")
+        .update({ status: action === 'accept' ? 'approved' : 'declined', assigned_at: action === 'accept' ? new Date().toISOString() : null })
+        .eq("id", requestId)
+        .select()
+      if (reqError || !reqData || reqData.length === 0) {
+        toast.error(reqError?.message || "Failed to update request.")
+        return
+      }
+      if (action === 'accept') {
+        // Update project stage to growing
+        const { error: projError, data: projData } = await supabase
+          .from("projects")
+          .update({ stage: 'growing' })
+          .eq("id", idea.id)
+          .select()
+        if (projError || !projData || projData.length === 0) {
+          toast.error(projError?.message || "Request approved, but failed to update project stage.")
+        } else {
+          toast.success("Request approved. Project is now growing!")
+        }
+      } else {
+        toast.success("Request declined.")
+      }
+      setTeamTabRefresh(r => r + 1)
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update request.")
+    }
+  }
 
   // Modal outside click handler
   useEffect(() => {
@@ -298,36 +433,40 @@ export default function EnhancedIdeaModal({
 
   return (
     <TooltipProvider>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div ref={modalRef} className="w-full max-w-3xl max-h-[95vh] overflow-y-auto border-emerald-100 bg-white/95 backdrop-blur-sm shadow-2xl rounded-2xl">
-          {/* thin gradient bar */}
-          <div className="h-2 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-t-2xl" />
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 sm:p-6 transition-all duration-300">
+        <div
+          ref={modalRef}
+          className="w-full max-w-5xl sm:max-w-6xl max-h-[97vh] overflow-y-auto border border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-100 to-teal-50 shadow-2xl rounded-3xl transition-all duration-300 transform scale-100 hover:scale-[1.01]"
+          style={{ boxShadow: '0 8px 40px 0 rgba(16, 185, 129, 0.15), 0 1.5px 8px 0 rgba(16, 185, 129, 0.08)' }}
+        >
+          {/* thick garden gradient bar */}
+          <div className="h-3 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-t-3xl" />
 
-          <CardHeader className="relative pb-4">
+          <CardHeader className="relative pb-4 px-8 pt-8">
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="absolute top-4 right-4 text-emerald-600 hover:bg-emerald-50"
+              className="absolute top-6 right-6 text-emerald-600 hover:bg-emerald-50 rounded-full p-2 transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </Button>
 
-            <div className="pr-12">
-              <div className="flex items-start justify-between mb-4">
+            <div className="pr-16">
+              <div className="flex items-start justify-between mb-6">
                 <div className="flex-1">
                   {/* Markdown Title */}
-                  <h1 className="text-3xl font-bold text-emerald-900 mb-3">
+                  <h1 className="text-4xl font-extrabold text-emerald-900 mb-4 tracking-tight leading-tight">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={{p: 'span'}}>{idea.title}</ReactMarkdown>
                   </h1>
 
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-4 mb-4">
                     <button
                       onClick={() => onProfileClick(authorAddr)}
                       className="flex items-center gap-2 hover:bg-emerald-50 rounded-lg p-2 transition-colors"
                     >
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback className="bg-emerald-100 text-emerald-700 text-lg">
                           {initials}
                         </AvatarFallback>
                       </Avatar>
@@ -344,13 +483,13 @@ export default function EnhancedIdeaModal({
                       </div>
                     </button>
 
-                    <Badge className={`${status.color}`}>
+                    <Badge className={`${status.color} text-base px-3 py-1 rounded-xl font-semibold`}> {/* More prominent badge */}
                       {status.emoji} {status.label}
                     </Badge>
 
                     <div className="flex items-center gap-1 text-emerald-600">
-                      <Calendar className="w-4 h-4" />
-                      <span className="text-sm">
+                      <Calendar className="w-5 h-5" />
+                      <span className="text-base">
                         {new Date(idea.created_at).toLocaleDateString()}
                       </span>
                     </div>
@@ -359,46 +498,69 @@ export default function EnhancedIdeaModal({
               </div>
 
               {/* top metrics row */}
-              <div className="grid grid-cols-4 gap-4 mb-6">
-                <div className="text-center p-3 bg-emerald-50 rounded-lg">
-                  <Heart className="w-5 h-5 text-rose-500 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-emerald-900">{idea.nurtureCount}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-8">
+                <div className="text-center p-4 bg-emerald-50 rounded-xl shadow-sm">
+                  <Heart className="w-6 h-6 text-rose-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-emerald-900">{idea.nurtureCount}</p>
                   <p className="text-xs text-emerald-600/70">Garden Loves</p>
                 </div>
-                <div className="text-center p-3 bg-emerald-50 rounded-lg">
-                  <Users className="w-5 h-5 text-blue-500 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-emerald-900">{idea.joinCount}</p>
+                <div className="text-center p-4 bg-emerald-50 rounded-xl shadow-sm">
+                  <Users className="w-6 h-6 text-blue-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-emerald-900">{idea.joinCount}</p>
                   <p className="text-xs text-emerald-600/70">Gardeners</p>
                 </div>
-                <div className="text-center p-3 bg-emerald-50 rounded-lg">
-                  <MessageCircle className="w-5 h-5 text-green-500 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-emerald-900">{idea.commentCount}</p>
+                <div className="text-center p-4 bg-emerald-50 rounded-xl shadow-sm">
+                  <MessageCircle className="w-6 h-6 text-green-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-emerald-900">{idea.commentCount}</p>
                   <p className="text-xs text-emerald-600/70">Discussions</p>
                 </div>
-                <div className="text-center p-3 bg-emerald-50 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-                  <p className="text-lg font-bold text-emerald-900">{idea.bloomScore||0}</p>
+                <div className="text-center p-4 bg-emerald-50 rounded-xl shadow-sm">
+                  <TrendingUp className="w-6 h-6 text-emerald-500 mx-auto mb-1" />
+                  <p className="text-2xl font-bold text-emerald-900">{idea.bloomScore||0}</p>
                   <p className="text-xs text-emerald-600/70">Bloom Score</p>
                 </div>
               </div>
 
               {/* action buttons */}
-              <div className="flex gap-3">
-                <Button
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white"
-                >
-                  <Leaf className="w-4 h-4 mr-2" />
-                  Join Garden
-                </Button>
+              <div className="flex gap-4 mb-2">
+                {/* Dynamic Join Garden/Requests button */}
+                {isOwner ? (
+                  <Button
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-6 py-2 rounded-xl text-base font-semibold shadow-md transition-all duration-200"
+                    onClick={() => setActiveTab("team")}
+                  >
+                    <Users className="w-5 h-5 mr-2" />
+                    View Join Requests
+                  </Button>
+                ) : userJoinRequest ? (
+                  <Button
+                    variant="outline"
+                    className="border-emerald-200 text-emerald-700 px-6 py-2 rounded-xl text-base font-semibold transition-all duration-200 cursor-default"
+                    disabled
+                  >
+                    <Users className="w-5 h-5 mr-2" />
+                    {userJoinRequest.status === 'pending' && 'Request Pending'}
+                    {userJoinRequest.status === 'accepted' && 'Request Accepted'}
+                    {userJoinRequest.status === 'declined' && 'Request Declined'}
+                  </Button>
+                ) : (
+                  <Button
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-6 py-2 rounded-xl text-base font-semibold shadow-md transition-all duration-200"
+                    onClick={() => setActiveTab("team")}
+                  >
+                    <Leaf className="w-5 h-5 mr-2" />
+                    Join Garden
+                  </Button>
+                )}
                 {(idea.stage === "growing" || idea.stage === "bloomed") && (
-                  <Button variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-                    <Github className="w-4 h-4 mr-2" />
+                  <Button variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 px-6 py-2 rounded-xl text-base font-semibold transition-all duration-200">
+                    <Github className="w-5 h-5 mr-2" />
                     Repository
                   </Button>
                 )}
                 {(idea.stage === "growing" || idea.stage === "bloomed") && (
-                  <Button variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-                    <ExternalLink className="w-4 h-4 mr-2" />
+                  <Button variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 px-6 py-2 rounded-xl text-base font-semibold transition-all duration-200">
+                    <ExternalLink className="w-5 h-5 mr-2" />
                     Live Demo
                   </Button>
                 )}
@@ -406,10 +568,10 @@ export default function EnhancedIdeaModal({
             </div>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="px-8 pb-8">
             {/* Modern Garden-Themed Tabs */}
-            <div className="relative mb-4">
-              <div className="flex overflow-x-auto no-scrollbar bg-gradient-to-r from-emerald-100 via-green-50 to-teal-100 rounded-2xl shadow-inner p-1 gap-2">
+            <div className="relative mb-6">
+              <div className="flex overflow-x-auto no-scrollbar bg-gradient-to-r from-emerald-100 via-green-50 to-teal-100 rounded-2xl shadow-inner p-2 gap-3">
                 {tabDefs.map((tab, idx) => (
                   <Tooltip key={tab.value}>
                     <TooltipTrigger asChild>
@@ -581,29 +743,114 @@ export default function EnhancedIdeaModal({
                   )}
                 </div>
               )}
-              {activeTab === "team" && (idea.stage === "growing" || idea.stage === "bloomed") && (
+              {activeTab === "team" && (
                 <div className="space-y-6">
-                  {idea.team?.length ? (
-                    idea.team.map((m, i) => (
-                      <div key={i} className="flex items-center gap-4 p-4 bg-emerald-50 rounded-lg">
-                        <Avatar className="w-12 h-12">
-                          <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                            {m.name
-                              .split(" ")
-                              .map((w) => w[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h4 className="font-semibold text-emerald-900">{m.name}</h4>
-                          <p className="text-emerald-600/80">{m.role}</p>
-                        </div>
-                      </div>
-                    ))
+                  {/* Owner: View join requests */}
+                  {isOwner ? (
+                    <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                      <h3 className="font-semibold text-emerald-800 mb-3 text-lg flex items-center gap-2"><Users className="w-5 h-5" /> Join Requests</h3>
+                      {joinRequestsLoading ? (
+                        <div className="text-emerald-400">Loading requests...</div>
+                      ) : joinRequests.length === 0 ? (
+                        <div className="text-emerald-400">No join requests yet.</div>
+                      ) : (
+                        <ul className="space-y-3">
+                          {joinRequests.map((req) => {
+                            const username = req.users?.bloom_username || req.builder_address.slice(0, 6) + '...' + req.builder_address.slice(-4)
+                            return (
+                              <li key={req.id} className="flex items-center gap-4 bg-white rounded-lg p-3 border border-emerald-100 shadow-sm">
+                                <Avatar className="w-8 h-8"><AvatarFallback className="bg-emerald-100 text-emerald-700">{username.slice(0,2).toUpperCase()}</AvatarFallback></Avatar>
+                                <div className="flex-1">
+                                  <div className="font-semibold text-emerald-900">{username}</div>
+                                  <div className="text-xs text-emerald-600">{req.builder_address}</div>
+                                  <div className="text-emerald-700 mt-1 text-sm">
+                                    {req.questions?.motivation && <div><span className="font-semibold">Motivation:</span> {req.questions.motivation}</div>}
+                                    {req.questions?.skills && <div><span className="font-semibold">Skills:</span> {req.questions.skills}</div>}
+                                    {req.questions?.experience && req.questions.experience.length > 0 && <div><span className="font-semibold">Experience:</span> {req.questions.experience}</div>}
+                                    {req.questions?.links && req.questions.links.length > 0 && <div><span className="font-semibold">Links:</span> <a href={req.questions.links} target="_blank" rel="noopener noreferrer" className="underline text-emerald-600">{req.questions.links}</a></div>}
+                                  </div>
+                                  <div className="text-xs text-emerald-400">Requested: {new Date(req.created_at).toLocaleString()}</div>
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <Badge className={
+                                    req.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                    req.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                    'bg-rose-100 text-rose-700'
+                                  }>{req.status.charAt(0).toUpperCase() + req.status.slice(1)}</Badge>
+                                  {req.status === 'pending' && (
+                                    <>
+                                      <Button size="sm" className="bg-emerald-500 text-white" onClick={() => handleRequestAction(req.id, 'accept')}>Accept</Button>
+                                      <Button size="sm" variant="outline" className="border-rose-200 text-rose-700" onClick={() => handleRequestAction(req.id, 'decline')}>Decline</Button>
+                                    </>
+                                  )}
+                                </div>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-40 text-emerald-400">
-                      <span className="text-4xl mb-2">🧑‍🌾</span>
-                      <span className="font-semibold">No gardeners yet. Invite your team!</span>
+                    // Non-owner: Join form or status
+                    <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 max-w-lg mx-auto">
+                      {userJoinRequest ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Badge className={
+                            userJoinRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                            userJoinRequest.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                            'bg-rose-100 text-rose-700'
+                          }>{userJoinRequest.status.charAt(0).toUpperCase() + userJoinRequest.status.slice(1)}</Badge>
+                          <div className="text-emerald-700">You have already requested to join this garden.</div>
+                        </div>
+                      ) : (
+                        <form onSubmit={e => { e.preventDefault(); handleJoinRequest(); }} className="flex flex-col gap-4">
+                          <div>
+                            <label className="text-emerald-800 font-semibold block mb-1">Why do you want to join this garden? <span className="text-rose-500">*</span></label>
+                            <textarea
+                              className="border border-emerald-200 rounded-lg p-2 min-h-[48px] bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                              value={joinMotivation}
+                              onChange={e => setJoinMotivation(e.target.value)}
+                              placeholder="Share your motivation..."
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-emerald-800 font-semibold block mb-1">What skills can you bring? <span className="text-rose-500">*</span></label>
+                            <input
+                              className="border border-emerald-200 rounded-lg p-2 bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                              value={joinSkills}
+                              onChange={e => setJoinSkills(e.target.value)}
+                              placeholder="e.g. Solidity, UI/UX, Community, etc."
+                              required
+                            />
+                          </div>
+                          <div>
+                            <label className="text-emerald-800 font-semibold block mb-1">Relevant experience</label>
+                            <textarea
+                              className="border border-emerald-200 rounded-lg p-2 min-h-[36px] bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                              value={joinExperience}
+                              onChange={e => setJoinExperience(e.target.value)}
+                              placeholder="Share any relevant experience (optional)"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-emerald-800 font-semibold block mb-1">Portfolio/Links</label>
+                            <input
+                              className="border border-emerald-200 rounded-lg p-2 bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                              value={joinLinks}
+                              onChange={e => setJoinLinks(e.target.value)}
+                              placeholder="Link to your portfolio, GitHub, etc. (optional)"
+                            />
+                          </div>
+                          <Button
+                            type="submit"
+                            className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-xl shadow"
+                            disabled={joinRequestSubmitting}
+                          >
+                            {joinRequestSubmitting ? "Submitting..." : "Submit Join Request"}
+                          </Button>
+                        </form>
+                      )}
                     </div>
                   )}
                 </div>
