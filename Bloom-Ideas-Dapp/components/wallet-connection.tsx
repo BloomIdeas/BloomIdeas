@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent } from "@/components/ui/card"
 import { Wallet, Copy, ExternalLink, LogOut, User } from "lucide-react"
 import Link from "next/link"
+import { logger } from "@/lib/logger";
 
 interface WalletConnectionProps {
   onConnect?: (address: string) => void
@@ -38,7 +39,7 @@ export default function WalletConnection({ onConnect }: WalletConnectionProps) {
         onConnect(mockAddress)
       }
     } catch (error) {
-      console.error("Failed to connect wallet:", error)
+      logger.error("Failed to connect wallet:", error)
     }
   }
 

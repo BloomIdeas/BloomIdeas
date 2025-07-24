@@ -24,6 +24,7 @@ import {
 import { useSprouts } from "@/hooks/use-sprouts"
 import { getReputationLevel } from "@/lib/sprouts"
 import { supabase } from "@/lib/supabaseClient"
+import { logger } from "@/lib/logger";
 
 interface SproutsDashboardProps {
   walletAddress: string
@@ -83,7 +84,7 @@ export default function SproutsDashboard({ walletAddress, onClose }: SproutsDash
         
         setSproutHistory(history)
       } catch (error) {
-        console.error("Error loading sprout history:", error)
+        logger.error("Error loading sprout history:", error)
       } finally {
         setHistoryLoading(false)
       }

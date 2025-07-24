@@ -44,6 +44,7 @@ import Link from "next/link"
 import { useRef } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { useCallback } from "react"
+import { logger } from "@/lib/logger";
 
 interface EnhancedIdeaModalProps {
   idea: {
@@ -119,7 +120,6 @@ export default function EnhancedIdeaModal({
   // const { address, isConnected } = useAccount()
   const { hasVerifiedSignature } = useSignatureVerification()
   const { totalSprouts, refreshSprouts } = useSprouts(walletAddress ?? null)
-  console.log('totalSprouts:', totalSprouts)
   const [userCommentCount, setUserCommentCount] = useState(0)
   const modalRef = useRef<HTMLDivElement>(null)
   const [joinRequests, setJoinRequests] = useState<any[]>([])
@@ -369,7 +369,7 @@ export default function EnhancedIdeaModal({
       if (!sproutsErr) {
         toast.success(`+${requiredSprouts} sprouts used to comment to reduce comments spam🌱`)
       } else {
-        console.error("Failed to add neglect sprouts:", sproutsErr)
+        logger.error("Failed to add neglect sprouts:", sproutsErr)
       }
       // Refresh comments and sprouts
       const { data: newComments } = await supabase
@@ -392,7 +392,7 @@ export default function EnhancedIdeaModal({
       // Always refresh sprouts after addition
       await refreshSprouts()
     } catch (error) {
-      console.error("Error submitting comment:", error)
+      logger.error("Error submitting comment:", error)
       toast.error("Failed to submit comment")
     } finally {
       setSubmittingComment(false)
@@ -745,6 +745,30 @@ export default function EnhancedIdeaModal({
               )}
               {activeTab === "team" && (
                 <div className="space-y-6">
+                  {/* Show approved gardeners if any */}
+                  {joinRequests.filter(r => r.status === 'approved').length > 0 && (
+                    <div className="bg-emerald-100/60 rounded-xl p-4 border border-emerald-200">
+                      <h3 className="font-semibold text-emerald-800 mb-3 text-lg flex items-center gap-2"><Users className="w-5 h-5" /> Gardeners</h3>
+                      <ul className="flex flex-wrap gap-4">
+                        {joinRequests.filter(r => r.status === 'approved').map((gardener) => {
+                          const username = gardener.users?.bloom_username || gardener.builder_address.slice(0, 6) + '...' + gardener.builder_address.slice(-4)
+                          return (
+                            <li key={gardener.id} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-emerald-100 shadow-sm">
+                              <Avatar className="w-8 h-8 cursor-pointer" onClick={() => onProfileClick(gardener.builder_address)}>
+                                <AvatarFallback className="bg-emerald-100 text-emerald-700">{username.slice(0,2).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <button onClick={() => onProfileClick(gardener.builder_address)} className="font-semibold text-emerald-900 hover:underline text-base">
+                                  {username}
+                                </button>
+                                <div className="text-xs text-emerald-600">{gardener.builder_address}</div>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  )}
                   {/* Owner: View join requests */}
                   {isOwner ? (
                     <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
@@ -791,67 +815,82 @@ export default function EnhancedIdeaModal({
                       )}
                     </div>
                   ) : (
-                    // Non-owner: Join form or status
-                    <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 max-w-lg mx-auto">
-                      {userJoinRequest ? (
-                        <div className="flex flex-col items-center gap-2">
-                          <Badge className={
-                            userJoinRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                            userJoinRequest.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                            'bg-rose-100 text-rose-700'
-                          }>{userJoinRequest.status.charAt(0).toUpperCase() + userJoinRequest.status.slice(1)}</Badge>
-                          <div className="text-emerald-700">You have already requested to join this garden.</div>
+                    // Non-owner: Show join form/status if not already approved
+                    (() => {
+                      // Check if user is already an approved gardener
+                      const isApprovedGardener = joinRequests.some(r => r.status === 'approved' && r.builder_address?.toLowerCase() === walletAddress?.toLowerCase());
+                      if (isApprovedGardener) {
+                        return (
+                          <div className="bg-green-50 rounded-xl p-4 border border-green-200 max-w-lg mx-auto flex flex-col items-center">
+                            <Badge className="bg-green-100 text-green-700 mb-2">Approved Gardener</Badge>
+                            <div className="text-green-800 font-semibold">You are an approved gardener in this garden!</div>
+                          </div>
+                        );
+                      }
+                      // If not approved, show join form/status as before
+                      return (
+                        <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 max-w-lg mx-auto">
+                          {userJoinRequest ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <Badge className={
+                                userJoinRequest.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                userJoinRequest.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                'bg-rose-100 text-rose-700'
+                              }>{userJoinRequest.status.charAt(0).toUpperCase() + userJoinRequest.status.slice(1)}</Badge>
+                              <div className="text-emerald-700">You have already requested to join this garden.</div>
+                            </div>
+                          ) : (
+                            <form onSubmit={e => { e.preventDefault(); handleJoinRequest(); }} className="flex flex-col gap-4">
+                              <div>
+                                <label className="text-emerald-800 font-semibold block mb-1">Why do you want to join this garden? <span className="text-rose-500">*</span></label>
+                                <textarea
+                                  className="border border-emerald-200 rounded-lg p-2 min-h-[48px] bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                                  value={joinMotivation}
+                                  onChange={e => setJoinMotivation(e.target.value)}
+                                  placeholder="Share your motivation..."
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="text-emerald-800 font-semibold block mb-1">What skills can you bring? <span className="text-rose-500">*</span></label>
+                                <input
+                                  className="border border-emerald-200 rounded-lg p-2 bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                                  value={joinSkills}
+                                  onChange={e => setJoinSkills(e.target.value)}
+                                  placeholder="e.g. Solidity, UI/UX, Community, etc."
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="text-emerald-800 font-semibold block mb-1">Relevant experience</label>
+                                <textarea
+                                  className="border border-emerald-200 rounded-lg p-2 min-h-[36px] bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                                  value={joinExperience}
+                                  onChange={e => setJoinExperience(e.target.value)}
+                                  placeholder="Share any relevant experience (optional)"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-emerald-800 font-semibold block mb-1">Portfolio/Links</label>
+                                <input
+                                  className="border border-emerald-200 rounded-lg p-2 bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
+                                  value={joinLinks}
+                                  onChange={e => setJoinLinks(e.target.value)}
+                                  placeholder="Link to your portfolio, GitHub, etc. (optional)"
+                                />
+                              </div>
+                              <Button
+                                type="submit"
+                                className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-xl shadow"
+                                disabled={joinRequestSubmitting}
+                              >
+                                {joinRequestSubmitting ? "Submitting..." : "Submit Join Request"}
+                              </Button>
+                            </form>
+                          )}
                         </div>
-                      ) : (
-                        <form onSubmit={e => { e.preventDefault(); handleJoinRequest(); }} className="flex flex-col gap-4">
-                          <div>
-                            <label className="text-emerald-800 font-semibold block mb-1">Why do you want to join this garden? <span className="text-rose-500">*</span></label>
-                            <textarea
-                              className="border border-emerald-200 rounded-lg p-2 min-h-[48px] bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
-                              value={joinMotivation}
-                              onChange={e => setJoinMotivation(e.target.value)}
-                              placeholder="Share your motivation..."
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="text-emerald-800 font-semibold block mb-1">What skills can you bring? <span className="text-rose-500">*</span></label>
-                            <input
-                              className="border border-emerald-200 rounded-lg p-2 bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
-                              value={joinSkills}
-                              onChange={e => setJoinSkills(e.target.value)}
-                              placeholder="e.g. Solidity, UI/UX, Community, etc."
-                              required
-                            />
-                          </div>
-                          <div>
-                            <label className="text-emerald-800 font-semibold block mb-1">Relevant experience</label>
-                            <textarea
-                              className="border border-emerald-200 rounded-lg p-2 min-h-[36px] bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
-                              value={joinExperience}
-                              onChange={e => setJoinExperience(e.target.value)}
-                              placeholder="Share any relevant experience (optional)"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-emerald-800 font-semibold block mb-1">Portfolio/Links</label>
-                            <input
-                              className="border border-emerald-200 rounded-lg p-2 bg-white focus:border-emerald-400 focus:ring-emerald-400/20 text-sm w-full"
-                              value={joinLinks}
-                              onChange={e => setJoinLinks(e.target.value)}
-                              placeholder="Link to your portfolio, GitHub, etc. (optional)"
-                            />
-                          </div>
-                          <Button
-                            type="submit"
-                            className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-xl shadow"
-                            disabled={joinRequestSubmitting}
-                          >
-                            {joinRequestSubmitting ? "Submitting..." : "Submit Join Request"}
-                          </Button>
-                        </form>
-                      )}
-                    </div>
+                      );
+                    })()
                   )}
                 </div>
               )}

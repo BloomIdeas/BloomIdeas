@@ -8,6 +8,7 @@ import { Loader2, Shield, CheckCircle, XCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useSignMessage } from 'wagmi'
 import { getAddress } from 'viem'
+import { logger } from "@/lib/logger";
 
 interface MessageSigningModalProps {
   address: string
@@ -41,7 +42,7 @@ This signature is used to verify your identity and grant you access to the Digit
       toast.success("Message signed successfully! Welcome to the Digital Garden!")
       onSignSuccess(signature)
     } catch (error) {
-      console.error("Signing failed:", error)
+      logger.error("Signing failed:", error)
       toast.error("Message signing was rejected or failed")
       onSignReject()
     } finally {

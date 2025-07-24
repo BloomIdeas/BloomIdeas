@@ -30,6 +30,7 @@ import { useGardenTheme } from '@/components/garden-theme-context';
 import { useParams } from "next/navigation"
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { logger } from "@/lib/logger";
 
 const mockIdea = {
   id: 1,
@@ -235,7 +236,7 @@ export default function IdeaDetailPage() {
         .order("created_at", { ascending: false })
       
       if (error) {
-        console.error("Error loading comments:", error)
+        logger.error("Error loading comments:", error)
         return
       }
       
@@ -255,7 +256,7 @@ export default function IdeaDetailPage() {
         .eq("id", projectId)
         .single();
       if (projectError) {
-        console.error("Error loading project:", projectError);
+        logger.error("Error loading project:", projectError);
         return;
       }
       setProject(projectData);
@@ -266,7 +267,7 @@ export default function IdeaDetailPage() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: true });
       if (linksError) {
-        console.error("Error loading project links:", linksError);
+        logger.error("Error loading project links:", linksError);
       } else {
         setProjectLinks(linksData || []);
       }
@@ -277,7 +278,7 @@ export default function IdeaDetailPage() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: true });
       if (visualsError) {
-        console.error("Error loading project visuals:", visualsError);
+        logger.error("Error loading project visuals:", visualsError);
       } else {
         setProjectVisuals(visualsData || []);
       }
@@ -326,7 +327,7 @@ export default function IdeaDetailPage() {
       if (!sproutsErr) {
         toast.success("+2 sprouts for your thoughtful comment! 🌱")
       } else {
-        console.error("Failed to award comment sprouts:", sproutsErr)
+        logger.error("Failed to award comment sprouts:", sproutsErr)
       }
 
       // Refresh comments
@@ -351,7 +352,7 @@ export default function IdeaDetailPage() {
 
       setNewComment("")
     } catch (error) {
-      console.error("Error submitting comment:", error)
+      logger.error("Error submitting comment:", error)
       toast.error("Failed to submit comment")
     } finally {
       setSubmittingComment(false)

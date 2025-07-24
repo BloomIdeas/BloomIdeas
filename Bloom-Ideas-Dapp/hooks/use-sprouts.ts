@@ -1,6 +1,7 @@
 // hooks/use-sprouts.ts
 import { useState, useEffect } from "react"
 import { getUserTotalSprouts, getUserSproutsByType } from "@/lib/sprouts"
+import { logger } from "@/lib/logger";
 
 export function useSprouts(userAddress: string | null) {
   const [totalSprouts, setTotalSprouts] = useState<number>(0)
@@ -28,7 +29,7 @@ export function useSprouts(userAddress: string | null) {
       setSproutsByType(byType)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch sprouts")
-      console.error("Error fetching sprouts:", err)
+      logger.error("Error fetching sprouts:", err)
     } finally {
       setLoading(false)
     }

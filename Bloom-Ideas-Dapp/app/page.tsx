@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getReputationLevel, getSproutTypeId } from "@/lib/sprouts"
 import { useGardenTheme } from '@/components/garden-theme-context';
+import { logger } from "@/lib/logger";
 
 import {
   Search,
@@ -122,7 +123,7 @@ export default function HomePage() {
     ])
 
     if (prjErr || pcErr || cErr || comErr || jErr || usersErr) {
-      console.error(prjErr, pcErr, cErr, comErr, jErr, usersErr)
+      logger.log("Welcome to Bloom Ideas!");
       return toast.error("Failed to load garden data")
     }
 
@@ -170,7 +171,7 @@ export default function HomePage() {
         .select('id,name')
         .order('name', { ascending: true })
       if (catsErr) {
-        console.error(catsErr)
+        logger.log("Welcome to Bloom Ideas!");
         toast.error("Failed to load categories")
         return
       }
@@ -276,12 +277,18 @@ export default function HomePage() {
         if (!sproutsErr) {
           toast.success("+1 sprout for nurturing! 🌱")
         } else {
-          console.error("Failed to award nurture sprouts:", sproutsErr)
+          logger.error("Failed to award nurture sprouts:", sproutsErr)
         }
       }
     }
     
     fetchAllData(categories) // Re-fetch with latest categories
+  }
+
+  // Handler to update project stage in Supabase
+  async function handleStageChange(project: Project, newStage: "planted" | "growing" | "bloomed") {
+    await supabase.from("projects").update({ stage: newStage }).eq("id", project.id);
+    fetchAllData(categories);
   }
 
   // --- filtering ---
@@ -511,7 +518,6 @@ export default function HomePage() {
                     {idea.stage}
                   </span>
                 </div>
-                
                 {/* Owner username display */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs text-emerald-500 font-semibold tracking-wide uppercase">Planted by</span>
@@ -520,13 +526,11 @@ export default function HomePage() {
                     {idea.bloomUsername ? `@${idea.bloomUsername}` : 'Unknown Planter'}
                   </span>
                 </div>
-
                 <div className="prose prose-emerald line-clamp-3 text-sm md:text-base">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {idea.description}
                   </ReactMarkdown>
                 </div>
-
                 <div className="flex flex-wrap gap-1 md:gap-2">
                   {idea.categoryNames.map((cat) => (
                     <span
@@ -537,7 +541,6 @@ export default function HomePage() {
                     </span>
                   ))}
                 </div>
-
                 <div className="flex items-center justify-between text-sm mt-3">
                   <div className="flex items-center gap-3 md:gap-6">
                     <button
@@ -564,7 +567,6 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-
                 <Button
                   onClick={() => handleOpenIdeaModal(idea)}
                   className="w-full mt-3 md:mt-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm md:text-base py-2 md:py-3"
@@ -575,7 +577,6 @@ export default function HomePage() {
             </div>
           ))}
         </div>
-
         {/* Empty State */}
         {filtered.length === 0 && (
           <div className="text-center py-12">
@@ -597,10 +598,8 @@ export default function HomePage() {
           </div>
         )}
       </main>
-
       {/* ================= FOOTER ================= */}
       <EnhancedFooter />
-
       {/* ================= POPUPS ================= */}
       {selectedProfile && (
         <ProfilePopup
@@ -615,7 +614,7 @@ export default function HomePage() {
           onProfileClick={(addr) => setSelectedProfile(addr)}
           links={modalLinks}
           visuals={modalVisuals}
-          walletAddress={walletAddress} // <-- pass walletAddress
+          walletAddress={walletAddress}
         />
       )}
     </div>

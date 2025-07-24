@@ -32,6 +32,7 @@ import EmojiPicker from "@/components/emoji-picker"
 import { useSprouts } from "@/hooks/use-sprouts"
 import { getReputationLevel } from "@/lib/sprouts"
 import { useGardenTheme } from '@/components/garden-theme-context';
+import { logger } from "@/lib/logger";
 
 // Types
 interface UserProfile {
@@ -143,7 +144,7 @@ export default function MyProfilePage() {
         })
       }
     } catch (error) {
-      console.error('Error fetching profile:', error)
+      logger.error('Error fetching profile:', error)
       toast.error('Failed to load profile')
     } finally {
       setIsLoading(false)
@@ -305,7 +306,7 @@ export default function MyProfilePage() {
       // Refresh profile data
       await fetchUserProfile()
     } catch (error) {
-      console.error('Error saving profile:', error)
+      logger.error('Error saving profile:', error)
       toast.error('Failed to save profile')
     } finally {
       setIsSaving(false)

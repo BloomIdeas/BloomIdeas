@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient"
 import { toast } from "sonner"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { calculateSproutsForSubmission, getSproutTypeId } from "@/lib/sprouts"
+import { logger } from "@/lib/logger";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -205,7 +206,7 @@ export default function SubmitIdeaPage() {
         })
       
       if (sproutsErr) {
-        console.error("Failed to award sprouts:", sproutsErr)
+        logger.error("Failed to award sprouts:", sproutsErr)
         // Don't throw here - we still want the project to be created
       }
 
@@ -240,7 +241,7 @@ export default function SubmitIdeaPage() {
       toast.success(`Your idea has been planted! 🌱 +${sproutsAmount} sprouts earned!`)
       router.push("/") // back to garden
     } catch (e) {
-      console.error(e)
+      logger.error(e)
       toast.error("Failed to submit idea")
     } finally {
       setSubmitting(false)
