@@ -41,6 +41,8 @@
     "@rainbow-me/rainbowkit": "^2.2.8",
     "@supabase/supabase-js": "^2.50.5",
     "@tanstack/react-query": "^5.83.0",
+    "@vercel/analytics": "^1.5.0",
+    "@vercel/speed-insights": "^1.2.0",
     "@walletconnect/universal-provider": "^2.21.4",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
