@@ -21,6 +21,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   const cookie = headers().get('cookie')
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/Logo-bloomideas.png" type="image/png" />
+      </head>
       <body className={inter.className}>
         <Providers cookie={cookie}>
           {children}

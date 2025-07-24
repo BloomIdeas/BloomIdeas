@@ -334,9 +334,9 @@ export default function HomePage() {
           {/* Desktop Header */}
           <div className="hidden md:flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Flower2 className="w-8 h-8 text-emerald-500" />
+              <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-10 h-10 rounded-full shadow" />
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                <h1 className="text-2xl font-bold text-emerald-900">
                   Bloom Ideas
                 </h1>
                 <p className="text-sm text-emerald-600/70">
@@ -362,9 +362,9 @@ export default function HomePage() {
           {/* Mobile Header */}
           <div className="md:hidden flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Flower2 className="w-6 h-6 text-emerald-500" />
+              <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-8 h-8 rounded-full shadow" />
               <div>
-                <h1 className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                <h1 className="text-lg font-bold text-emerald-900">
                   Bloom Ideas
                 </h1>
                 <p className="text-xs text-emerald-600/70">

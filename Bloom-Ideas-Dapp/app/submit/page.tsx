@@ -265,9 +265,7 @@ export default function SubmitIdeaPage() {
                 </Button>
               </Link>
               <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-6 h-6 md:w-8 md:h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-                  <Flower2 className="w-3 h-3 md:w-5 md:h-5 text-white" />
-                </div>
+                <img src="/Logo-bloomideas.png" alt="Bloom Ideas Logo" className="w-8 h-8 rounded-full shadow" />
                 <span className="font-semibold text-emerald-800 text-sm md:text-base">Plant New Idea</span>
               </div>
             </div>
