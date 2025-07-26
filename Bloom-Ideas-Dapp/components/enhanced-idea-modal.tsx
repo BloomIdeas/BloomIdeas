@@ -32,6 +32,7 @@ import {
   Send,
   Code,
   Zap,
+  Share2,
 } from "lucide-react"
 import { useEffect } from "react"
 import { supabase } from "@/lib/supabaseClient"
@@ -443,14 +444,46 @@ export default function EnhancedIdeaModal({
           <div className="h-3 bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 rounded-t-3xl" />
 
           <CardHeader className="relative pb-4 px-8 pt-8">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="absolute top-6 right-6 text-emerald-600 hover:bg-emerald-50 rounded-full p-2 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="absolute top-6 right-6 flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const ideaUrl = `${window.location.origin}/idea/${idea.id}`
+                      navigator.clipboard.writeText(ideaUrl).then(() => {
+                        toast.success("Idea link copied to clipboard!")
+                      }).catch(() => {
+                        // Fallback for older browsers
+                        const textArea = document.createElement("textarea")
+                        textArea.value = ideaUrl
+                        document.body.appendChild(textArea)
+                        textArea.select()
+                        document.execCommand("copy")
+                        document.body.removeChild(textArea)
+                        toast.success("Idea link copied to clipboard!")
+                      })
+                    }}
+                    className="text-emerald-600 hover:bg-emerald-50 rounded-full p-2 transition-colors"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Share idea link</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-emerald-600 hover:bg-emerald-50 rounded-full p-2 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
 
             <div className="pr-16">
               <div className="flex items-start justify-between mb-6">

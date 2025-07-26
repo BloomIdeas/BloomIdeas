@@ -96,6 +96,14 @@ export default function EnhancedFooter() {
             </button>
           </div>
         </div>
+        <div className="flex justify-center">
+          <Link
+            href="/glossary"
+            className="hover:text-emerald-800 transition"
+          >
+            📖 Glossary
+          </Link>
+        </div>
 
         {/* Help & Credits */}
         <div className="text-center text-sm text-emerald-600/70 space-y-1">

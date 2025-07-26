@@ -17,6 +17,7 @@ import {
   Sparkles,
   ExternalLink,
   Zap,
+  Loader2,
 } from "lucide-react"
 import Link from "next/link"
 import { Progress } from "@/components/ui/progress"
@@ -200,6 +201,13 @@ export default function IdeaDetailPage() {
   const [project, setProject] = useState<any>(null);
   const [projectLinks, setProjectLinks] = useState<any[]>([]);
   const [projectVisuals, setProjectVisuals] = useState<any[]>([]);
+  const [projectOwner, setProjectOwner] = useState<any>(null);
+  const [projectCategories, setProjectCategories] = useState<any[]>([]);
+  const [projectTechStacks, setProjectTechStacks] = useState<any[]>([]);
+  const [careActions, setCareActions] = useState<any[]>([]);
+  const [relatedProjects, setRelatedProjects] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const getThemeHeaderGradient = () => {
     switch (gardenTheme) {
@@ -215,6 +223,141 @@ export default function IdeaDetailPage() {
         return 'bg-white/80';
     }
   };
+
+  // Load all project data
+  useEffect(() => {
+    if (!projectId) return;
+    
+    const fetchAllProjectData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch project with owner details
+        const { data: projectData, error: projectError } = await supabase
+          .from("projects")
+          .select(`
+            *,
+            users!projects_owner_address_fkey (
+              bloom_username,
+              wallet_address,
+              description,
+              github_username,
+              twitter_username,
+              pfp_emoji
+            )
+          `)
+          .eq("id", projectId)
+          .single();
+        
+        if (projectError) {
+          logger.error("Error loading project:", projectError);
+          setError("Failed to load project details");
+          return;
+        }
+        
+        setProject(projectData);
+        setProjectOwner(projectData.users);
+
+        // Fetch project categories
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from("project_categories")
+          .select(`
+            categories (
+              id,
+              name
+            )
+          `)
+          .eq("project_id", projectId);
+        
+        if (!categoriesError) {
+          setProjectCategories(categoriesData?.map((item: any) => item.categories) || []);
+        }
+
+        // Fetch project tech stacks
+        const { data: techStacksData, error: techStacksError } = await supabase
+          .from("project_tech_stacks")
+          .select(`
+            tech_stacks (
+              id,
+              name
+            )
+          `)
+          .eq("project_id", projectId);
+        
+        if (!techStacksError) {
+          setProjectTechStacks(techStacksData?.map((item: any) => item.tech_stacks) || []);
+        }
+
+        // Fetch project links
+        const { data: linksData, error: linksError } = await supabase
+          .from("project_links")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: true });
+        
+        if (!linksError) {
+          setProjectLinks(linksData || []);
+        }
+
+        // Fetch project visuals
+        const { data: visualsData, error: visualsError } = await supabase
+          .from("project_visuals")
+          .select("*")
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: true });
+        
+        if (!visualsError) {
+          setProjectVisuals(visualsData || []);
+        }
+
+        // Fetch care actions (votes, interest)
+        const { data: careActionsData, error: careActionsError } = await supabase
+          .from("project_care_actions")
+          .select("*")
+          .eq("project_id", projectId);
+        
+        if (!careActionsError) {
+          setCareActions(careActionsData || []);
+        }
+
+        // Fetch related projects (same categories)
+        if (categoriesData && categoriesData.length > 0) {
+          const categoryIds = categoriesData.map((item: any) => item.categories.id);
+          const { data: relatedData, error: relatedError } = await supabase
+            .from("project_categories")
+            .select(`
+              project_id,
+              projects!project_categories_project_id_fkey (
+                id,
+                title,
+                description,
+                stage,
+                created_at,
+                users!projects_owner_address_fkey (
+                  bloom_username
+                )
+              )
+            `)
+            .in("category_id", categoryIds)
+            .neq("project_id", projectId)
+            .limit(3);
+          
+          if (!relatedError) {
+            setRelatedProjects(relatedData?.map((item: any) => item.projects) || []);
+          }
+        }
+
+      } catch (error) {
+        logger.error("Error fetching project data:", error);
+        setError("Failed to load project data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllProjectData();
+  }, [projectId]);
 
   // Load comments for this idea
   useEffect(() => {
@@ -246,45 +389,116 @@ export default function IdeaDetailPage() {
     loadComments()
   }, [projectId])
 
+  // Check if user has voted or shown interest
   useEffect(() => {
-    if (!projectId) return;
-    const fetchProjectData = async () => {
-      // Fetch project
-      const { data: projectData, error: projectError } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("id", projectId)
-        .single();
-      if (projectError) {
-        logger.error("Error loading project:", projectError);
-        return;
-      }
-      setProject(projectData);
-      // Fetch links
-      const { data: linksData, error: linksError } = await supabase
-        .from("project_links")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: true });
-      if (linksError) {
-        logger.error("Error loading project links:", linksError);
+    if (!walletAddress || !projectId || careActions.length === 0) return;
+    
+    const userActions = careActions.filter((action: any) => action.user_address === walletAddress);
+    setHasVoted(userActions.some((action: any) => action.action === 'nurture'));
+    setIsInterested(userActions.some((action: any) => action.action === 'water'));
+  }, [walletAddress, projectId, careActions]);
+
+  // Handle voting
+  const handleVote = async () => {
+    if (!walletAddress) {
+      toast.error("Connect your wallet first");
+      return;
+    }
+
+    try {
+      const action = hasVoted ? 'unvote' : 'nurture';
+      
+      if (hasVoted) {
+        // Remove vote
+        const { error } = await supabase
+          .from("project_care_actions")
+          .delete()
+          .eq("project_id", projectId)
+          .eq("user_address", walletAddress)
+          .eq("action", "nurture");
+        
+        if (error) throw error;
       } else {
-        setProjectLinks(linksData || []);
+        // Add vote
+        const { error } = await supabase
+          .from("project_care_actions")
+          .insert({
+            project_id: projectId,
+            user_address: walletAddress,
+            action: "nurture"
+          });
+        
+        if (error) throw error;
       }
-      // Fetch visuals
-      const { data: visualsData, error: visualsError } = await supabase
-        .from("project_visuals")
+
+      // Refresh care actions
+      const { data: newCareActions, error: refreshError } = await supabase
+        .from("project_care_actions")
         .select("*")
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: true });
-      if (visualsError) {
-        logger.error("Error loading project visuals:", visualsError);
-      } else {
-        setProjectVisuals(visualsData || []);
+        .eq("project_id", projectId);
+      
+      if (!refreshError) {
+        setCareActions(newCareActions || []);
       }
-    };
-    fetchProjectData();
-  }, [projectId]);
+
+      setHasVoted(!hasVoted);
+      toast.success(hasVoted ? "Vote removed" : "Vote added!");
+    } catch (error) {
+      logger.error("Error handling vote:", error);
+      toast.error("Failed to update vote");
+    }
+  };
+
+  // Handle interest
+  const handleInterest = async () => {
+    if (!walletAddress) {
+      toast.error("Connect your wallet first");
+      return;
+    }
+
+    try {
+      const action = isInterested ? 'uninterest' : 'water';
+      
+      if (isInterested) {
+        // Remove interest
+        const { error } = await supabase
+          .from("project_care_actions")
+          .delete()
+          .eq("project_id", projectId)
+          .eq("user_address", walletAddress)
+          .eq("action", "water");
+        
+        if (error) throw error;
+      } else {
+        // Add interest
+        const { error } = await supabase
+          .from("project_care_actions")
+          .insert({
+            project_id: projectId,
+            user_address: walletAddress,
+            action: "water"
+          });
+        
+        if (error) throw error;
+      }
+
+      // Refresh care actions
+      const { data: newCareActions, error: refreshError } = await supabase
+        .from("project_care_actions")
+        .select("*")
+        .eq("project_id", projectId);
+      
+      if (!refreshError) {
+        setCareActions(newCareActions || []);
+      }
+
+      setIsInterested(!isInterested);
+      toast.success(isInterested ? "Interest removed" : "Interest added!");
+    } catch (error) {
+      logger.error("Error handling interest:", error);
+      toast.error("Failed to update interest");
+    }
+  };
 
   // Handle comment submission
   const handleSubmitComment = async () => {
@@ -359,7 +573,67 @@ export default function IdeaDetailPage() {
     }
   }
 
-  const ideaData = project || mockIdea;
+  // Calculate metrics
+  const voteCount = careActions.filter((action: any) => action.action === 'nurture').length;
+  const interestCount = careActions.filter((action: any) => action.action === 'water').length;
+  const hotScore = Math.round((voteCount * 0.4 + interestCount * 0.3 + comments.length * 0.3) * 10);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-emerald-600" />
+          <p className="text-emerald-700">Loading project details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error || !project) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error || "Project not found"}</p>
+          <Link href="/">
+            <Button variant="outline">Back to Garden</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const ideaData = {
+    ...project,
+    author: projectOwner?.wallet_address || "Unknown",
+    authorName: projectOwner?.bloom_username || "Anonymous",
+    authorEns: projectOwner?.bloom_username || "anonymous.eth",
+    authorReputation: "Builder",
+    tags: projectCategories.map((cat: any) => cat.name),
+    votes: voteCount,
+    interested: interestCount,
+    status: project.stage,
+    createdAt: new Date(project.created_at).toLocaleDateString(),
+    techStack: projectTechStacks.map((tech: any) => tech.name),
+    chains: ["Ethereum"], // Default, could be enhanced with chain data
+    funding: {
+      target: 50000,
+      raised: 32000,
+      backers: 156,
+    },
+    milestones: [
+      { name: "Project Creation", status: "completed", date: new Date(project.created_at).toLocaleDateString() },
+      { name: "Development", status: project.stage === 'growing' ? "in-progress" : "pending", date: "In Progress" },
+      { name: "Launch", status: "pending", date: "Future" },
+    ],
+    mockups: projectVisuals.map((visual: any) => visual.url),
+    githubRepo: projectLinks.find((link: any) => link.label?.toLowerCase().includes('github'))?.url || "#",
+    demoUrl: projectLinks.find((link: any) => link.label?.toLowerCase().includes('demo'))?.url || "#",
+    inDevelopment: project.stage !== 'harvested',
+    hotScore,
+    developmentProgress: project.stage === 'planted' ? 25 : project.stage === 'growing' ? 65 : project.stage === 'blooming' ? 85 : 100,
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
@@ -403,7 +677,9 @@ export default function IdeaDetailPage() {
                       className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-emerald-600/70 mb-3 md:mb-4 hover:bg-emerald-50 rounded-lg p-2 transition-colors"
                     >
                       <Avatar className="w-5 h-5 md:w-6 md:h-6">
-                        <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">GT</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-emerald-100 text-emerald-700">
+                          {projectOwner?.pfp_emoji || ideaData.authorName.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
                       <span className="font-medium">{ideaData.authorName}</span>
                       <span className="hidden sm:inline">({ideaData.author})</span>
@@ -429,16 +705,18 @@ export default function IdeaDetailPage() {
                   <div className="flex items-center gap-2 md:gap-3">
                     <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse"></div>
                     <span className="font-medium text-green-800 text-sm md:text-base">🌱 Currently Growing</span>
-                    <Link href={ideaData.githubRepo} className="ml-auto">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-green-200 text-green-700 hover:bg-green-50 bg-transparent text-xs"
-                      >
-                        <Github className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                        {isMobile ? "Repo" : "View Repository"}
-                      </Button>
-                    </Link>
+                    {ideaData.githubRepo !== "#" && (
+                      <Link href={ideaData.githubRepo} className="ml-auto">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-green-200 text-green-700 hover:bg-green-50 bg-transparent text-xs"
+                        >
+                          <Github className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                          {isMobile ? "Repo" : "View Repository"}
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -578,104 +856,49 @@ export default function IdeaDetailPage() {
 
                 {/* Links */}
                 <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent text-xs md:text-sm"
-                  >
-                    <ExternalLink className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                    {isMobile ? "Demo" : "Live Demo"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent text-xs md:text-sm"
-                  >
-                    <Github className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                    {isMobile ? "Repo" : "Repository"}
-                  </Button>
+                  {ideaData.demoUrl !== "#" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent text-xs md:text-sm"
+                      onClick={() => window.open(ideaData.demoUrl, '_blank')}
+                    >
+                      <ExternalLink className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      {isMobile ? "Demo" : "Live Demo"}
+                    </Button>
+                  )}
+                  {ideaData.githubRepo !== "#" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 bg-transparent text-xs md:text-sm"
+                      onClick={() => window.open(ideaData.githubRepo, '_blank')}
+                    >
+                      <Github className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
+                      {isMobile ? "Repo" : "Repository"}
+                    </Button>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Full Description */}
-            <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-3 md:pb-4">
-                <h2 className="text-lg md:text-xl font-semibold text-emerald-900">📖 Detailed Overview</h2>
-              </CardHeader>
-              <CardContent>
-                {/* Visuals Grid */}
-                {projectVisuals.length > 0 && (
-                  <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {projectVisuals.map((visual: any) => (
-                      <div key={visual.id} className="rounded-lg overflow-hidden border border-emerald-100 bg-emerald-50 flex flex-col items-center justify-center">
-                        <img
-                          src={visual.url}
-                          alt={visual.alt_text || "Project visual"}
-                          className="object-cover w-full h-40 sm:h-48 md:h-56"
-                          style={{ maxHeight: 220 }}
-                        />
-                        {visual.alt_text && (
-                          <div className="p-2 text-xs text-emerald-700 text-center bg-emerald-50 w-full">{visual.alt_text}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {/* Markdown Full Description */}
-                <div className="prose prose-emerald max-w-none mb-4">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{ideaData.fullDescription}</ReactMarkdown>
-                </div>
-                {/* Project Links */}
-                {projectLinks.length > 0 && (
-                  <div className="mt-2">
-                    <h3 className="font-semibold text-emerald-800 text-sm mb-2">Project Links</h3>
-                    <ul className="space-y-2">
-                      {projectLinks.map((link: any) => {
-                        let urlObj;
-                        try { urlObj = new URL(link.url); } catch { urlObj = null; }
-                        const domain = urlObj ? urlObj.hostname.replace(/^www\./, "") : link.url;
-                        return (
-                          <li key={link.id} className="flex items-center gap-3 p-2 bg-emerald-50 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors">
-                            <img
-                              src={`https://www.google.com/s2/favicons?domain=${urlObj ? urlObj.hostname : link.url}&sz=32`}
-                              alt="favicon"
-                              className="w-5 h-5 rounded"
-                              style={{ minWidth: 20 }}
-                            />
-                            <a
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-emerald-700 font-medium hover:underline"
-                            >
-                              {link.label || domain}
-                            </a>
-                            <span className="ml-auto text-xs text-emerald-400">{domain}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
             {/* Tech Stack */}
-            <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-3 md:pb-4">
-                <h2 className="text-lg md:text-xl font-semibold text-emerald-900">Tech Stack</h2>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-1 md:gap-2">
-                  {ideaData.techStack.map((tech: any) => (
-                    <Badge key={tech} variant="outline" className="border-emerald-200 text-emerald-700 text-xs">
-                      {tech}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            {ideaData.techStack.length > 0 && (
+              <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
+                <CardHeader className="pb-3 md:pb-4">
+                  <h2 className="text-lg md:text-xl font-semibold text-emerald-900">Tech Stack</h2>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-1 md:gap-2">
+                    {ideaData.techStack.map((tech: any) => (
+                      <Badge key={tech} variant="outline" className="border-emerald-200 text-emerald-700 text-xs">
+                        {tech}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Comments */}
             <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
@@ -747,7 +970,7 @@ export default function IdeaDetailPage() {
               <CardContent className="space-y-2 md:space-y-3">
                 <Button
                   className={`w-full text-sm md:text-base ${hasVoted ? "bg-rose-500 hover:bg-rose-600" : "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"} text-white`}
-                  onClick={() => setHasVoted(!hasVoted)}
+                  onClick={handleVote}
                 >
                   <Heart className={`w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 ${hasVoted ? "fill-current" : ""}`} />
                   {hasVoted ? "Loved!" : "Love This Idea"}
@@ -756,7 +979,7 @@ export default function IdeaDetailPage() {
                 <Button
                   variant="outline"
                   className={`w-full text-sm md:text-base ${isInterested ? "border-green-500 text-green-700 bg-green-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}
-                  onClick={() => setIsInterested(!isInterested)}
+                  onClick={handleInterest}
                 >
                   <Leaf className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
                   {isInterested ? "Growing This!" : "I Want to Build This"}
@@ -789,7 +1012,7 @@ export default function IdeaDetailPage() {
                     <MessageCircle className="w-3 h-3 md:w-4 md:h-4 text-green-500" />
                     <span className="text-xs md:text-sm">Garden Discussions</span>
                   </div>
-                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{mockComments.length}</span>
+                  <span className="font-semibold text-emerald-900 text-sm md:text-base">{comments.length}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1 md:gap-2 text-emerald-700">
@@ -809,39 +1032,34 @@ export default function IdeaDetailPage() {
             </Card>
 
             {/* Similar Ideas */}
-            <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
-              <CardHeader className="pb-3 md:pb-4">
-                <h3 className="font-semibold text-emerald-900 text-sm md:text-base">Related Blooms</h3>
-              </CardHeader>
-              <CardContent className="space-y-2 md:space-y-3">
-                <Link
-                  href="/idea/2"
-                  className="block p-2 md:p-3 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors"
-                >
-                  <h4 className="font-medium text-emerald-900 mb-1 text-sm md:text-base">ZK Bloom Verification</h4>
-                  <p className="text-xs md:text-sm text-emerald-700/80">Privacy-focused credential system</p>
-                  <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2 text-xs text-emerald-600">
-                    <Heart className="w-2 h-2 md:w-3 md:h-3" />
-                    <span>38</span>
-                    <Users className="w-2 h-2 md:w-3 md:h-3 ml-1 md:ml-2" />
-                    <span>12</span>
-                  </div>
-                </Link>
-                <Link
-                  href="/idea/3"
-                  className="block p-2 md:p-3 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors"
-                >
-                  <h4 className="font-medium text-emerald-900 mb-1 text-sm md:text-base">NFT Seed Exchange</h4>
-                  <p className="text-xs md:text-sm text-emerald-700/80">Growing NFT marketplace</p>
-                  <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2 text-xs text-emerald-600">
-                    <Heart className="w-2 h-2 md:w-3 md:h-3" />
-                    <span>29</span>
-                    <Users className="w-2 h-2 md:w-3 md:h-3 ml-1 md:ml-2" />
-                    <span>6</span>
-                  </div>
-                </Link>
-              </CardContent>
-            </Card>
+            {relatedProjects.length > 0 && (
+              <Card className="border-emerald-100 bg-white/80 backdrop-blur-sm">
+                <CardHeader className="pb-3 md:pb-4">
+                  <h3 className="font-semibold text-emerald-900 text-sm md:text-base">Related Blooms</h3>
+                </CardHeader>
+                <CardContent className="space-y-2 md:space-y-3">
+                  {relatedProjects.map((relatedProject: any) => (
+                    <Link
+                      key={relatedProject.id}
+                      href={`/idea/${relatedProject.id}`}
+                      className="block p-2 md:p-3 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors"
+                    >
+                      <h4 className="font-medium text-emerald-900 mb-1 text-sm md:text-base">{relatedProject.title}</h4>
+                      <p className="text-xs md:text-sm text-emerald-700/80">
+                        {relatedProject.description.length > 100 
+                          ? `${relatedProject.description.slice(0, 100)}...` 
+                          : relatedProject.description}
+                      </p>
+                      <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-2 text-xs text-emerald-600">
+                        <span className="capitalize">{relatedProject.stage}</span>
+                        <span>•</span>
+                        <span>{relatedProject.users?.bloom_username || "Anonymous"}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
         {selectedProfile && <ProfilePopup address={selectedProfile} onClose={() => setSelectedProfile(null)} />}
